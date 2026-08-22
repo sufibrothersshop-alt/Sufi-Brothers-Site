@@ -18,7 +18,9 @@ import {
 import { categories as menuCategories, categoryEmoji } from '@/lib/menu-data'
 import { DishDialog } from '@/components/dish-dialog'
 import { CartDialog } from '@/components/cart-dialog'
+import { OrderTrackerWidget } from '@/components/order-tracker-widget'
 import { useResolvedMenu, type ResolvedMenuItem } from '@/lib/use-resolved-menu'
+import { useOrderTracker } from '@/lib/use-order-tracker'
 
 export default function Page() {
   const menuItems = useResolvedMenu()
@@ -29,6 +31,7 @@ export default function Page() {
   const [liked, setLiked] = useState<number[]>([])
   const [selectedDish, setSelectedDish] = useState<ResolvedMenuItem | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
+  const orderTracker = useOrderTracker()
 
   const filteredDishes = useMemo(() => menuItems.filter((dish) => {
     const categoryMatch = dish.category === activeCategory
@@ -115,7 +118,19 @@ export default function Page() {
         onDecrement={decrementCartItem}
         onRemove={removeCartItem}
         onClear={() => setCart({})}
+        onOrderPlaced={orderTracker.startTracking}
       />
+
+      {orderTracker.activeOrder && (
+        <OrderTrackerWidget
+          order={orderTracker.activeOrder}
+          progress={orderTracker.progress}
+          remainingMinutes={orderTracker.remainingMinutes}
+          currentPhaseIndex={orderTracker.currentPhaseIndex}
+          isDelivered={orderTracker.isDelivered}
+          onDismiss={orderTracker.clearTracking}
+        />
+      )}
     </main>
   )
 }

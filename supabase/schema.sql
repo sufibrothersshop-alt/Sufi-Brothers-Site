@@ -34,6 +34,7 @@ create table if not exists public.orders (
   latitude         double precision,
   longitude        double precision,
   notes            text,
+  delivery_fee     numeric(10, 2) not null default 0,
   total_amount     numeric(10, 2) not null check (total_amount >= 0),
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
@@ -42,6 +43,7 @@ create table if not exists public.orders (
 -- additive migration in case orders already existed before latitude/longitude were added
 alter table public.orders add column if not exists latitude double precision;
 alter table public.orders add column if not exists longitude double precision;
+alter table public.orders add column if not exists delivery_fee numeric(10, 2) not null default 0;
 
 create index if not exists idx_orders_customer_phone on public.orders (customer_phone);
 create index if not exists idx_orders_status on public.orders (status);
@@ -82,7 +84,7 @@ create table if not exists public.menu_availability (
 alter table public.menu_availability add column if not exists price_override numeric(10, 2);
 
 insert into public.menu_availability (item_id)
-select unnest(array[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58])
+select unnest(array[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61])
 on conflict (item_id) do nothing;
 
 -- Note: there is no "admins" table — the admin panel uses a single
@@ -176,6 +178,8 @@ as $$
 declare
   v_is_banned      boolean;
   v_order_id       uuid;
+  v_subtotal       numeric(10, 2);
+  v_delivery_fee   numeric(10, 2);
   v_total          numeric(10, 2);
   v_sold_out_names text;
 begin
@@ -215,12 +219,18 @@ begin
   -- stale page can't under-charge (or over-charge) against the admin's
   -- current rate.
   select sum(coalesce(ma.price_override, (item->>'unit_price')::numeric) * (item->>'quantity')::integer)
-  into v_total
+  into v_subtotal
   from jsonb_array_elements(p_items) as item
   left join public.menu_availability ma on ma.item_id = (item->>'id')::integer;
 
-  insert into public.orders (customer_phone, delivery_address, latitude, longitude, notes, total_amount)
-  values (trim(p_phone), trim(p_address), p_latitude, p_longitude, nullif(trim(p_notes), ''), v_total)
+  -- Rs. 100 delivery, free above Rs. 1000 subtotal — decided here, not
+  -- trusted from the client, so a stale page can't claim free delivery it
+  -- didn't qualify for.
+  v_delivery_fee := case when v_subtotal >= 1000 then 0 else 100 end;
+  v_total := v_subtotal + v_delivery_fee;
+
+  insert into public.orders (customer_phone, delivery_address, latitude, longitude, notes, delivery_fee, total_amount)
+  values (trim(p_phone), trim(p_address), p_latitude, p_longitude, nullif(trim(p_notes), ''), v_delivery_fee, v_total)
   returning id into v_order_id;
 
   insert into public.order_items (order_id, item_name, item_category, unit_price, quantity)

@@ -28,6 +28,7 @@ export type OrderRow = {
   latitude: number | null
   longitude: number | null
   notes: string | null
+  delivery_fee: number
   total_amount: number
   created_at: string
   order_items: OrderItemRow[]
@@ -83,6 +84,10 @@ export function OrderCard({ order, showCustomer = true }: { order: OrderRow; sho
             <span>Rs. {item.line_total}</span>
           </li>
         ))}
+        <li className="flex justify-between text-muted-foreground">
+          <span>Delivery</span>
+          <span>{order.delivery_fee > 0 ? `Rs. ${order.delivery_fee}` : 'Free'}</span>
+        </li>
       </ul>
     </div>
   )

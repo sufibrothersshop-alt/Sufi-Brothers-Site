@@ -6,6 +6,9 @@ import { CheckCircle2, LocateFixed, Minus, Plus, ShoppingBag, Trash2, X } from '
 import type { ResolvedMenuItem } from '@/lib/use-resolved-menu'
 import { createClient } from '@/lib/supabase/client'
 
+const DELIVERY_FEE = 100
+const FREE_DELIVERY_THRESHOLD = 1000
+
 type CartDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -15,14 +18,17 @@ type CartDialogProps = {
   onDecrement: (id: number) => void
   onRemove: (id: number) => void
   onClear: () => void
+  onOrderPlaced?: (orderId: string, total: number) => void
 }
 
-export function CartDialog({ open, onOpenChange, menuItems, cart, onIncrement, onDecrement, onRemove, onClear }: CartDialogProps) {
+export function CartDialog({ open, onOpenChange, menuItems, cart, onIncrement, onDecrement, onRemove, onClear, onOrderPlaced }: CartDialogProps) {
   const lines = Object.entries(cart)
     .map(([id, quantity]) => ({ dish: menuItems.find((item) => item.id === Number(id)), quantity }))
     .filter((line): line is { dish: NonNullable<typeof line.dish>; quantity: number } => !!line.dish && line.quantity > 0)
 
-  const total = lines.reduce((sum, line) => sum + line.dish.price * line.quantity, 0)
+  const subtotal = lines.reduce((sum, line) => sum + line.dish.price * line.quantity, 0)
+  const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE
+  const total = subtotal + deliveryFee
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -89,6 +95,7 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, onIncrement, o
     }
 
     setOrderId(data as string)
+    onOrderPlaced?.(data as string, total)
     onClear()
   }
 
@@ -154,7 +161,7 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, onIncrement, o
                     {locating ? 'Getting your location…' : coords ? 'Location pinned ✓' : 'Share my current location'}
                   </button>
                   {locationError && <p className="text-xs text-destructive">{locationError}</p>}
-                  <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes for the rider (optional)" className="rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary" />
+                  <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Special instructions (optional)" className="rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary" />
                 </div>
               </div>
             )}
@@ -162,9 +169,25 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, onIncrement, o
             {lines.length > 0 && !orderId && (
               <div className="border-t border-border px-6 py-5">
                 {error && <p className="mb-3 text-sm font-medium text-destructive">{error}</p>}
-                <div className="mb-4 flex items-center justify-between">
+                <div className="mb-3 flex items-center justify-between">
                   <button onClick={onClear} className="text-xs font-bold text-muted-foreground underline">Clear cart</button>
-                  <span className="font-serif text-2xl font-black text-primary">Rs. {total}</span>
+                </div>
+                <div className="mb-4 flex flex-col gap-1.5 rounded-xl bg-secondary/20 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span>Rs. {subtotal}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Delivery</span>
+                    <span>{deliveryFee === 0 ? 'Free' : `Rs. ${deliveryFee}`}</span>
+                  </div>
+                  {deliveryFee > 0 && (
+                    <p className="text-xs text-muted-foreground/80">Add Rs. {FREE_DELIVERY_THRESHOLD - subtotal} more for free delivery</p>
+                  )}
+                  <div className="mt-1 flex items-center justify-between border-t border-border pt-1.5 font-serif text-lg font-black text-primary">
+                    <span>Total</span>
+                    <span>Rs. {total}</span>
+                  </div>
                 </div>
                 <button
                   onClick={placeOrder}
