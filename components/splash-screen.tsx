@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 
 const SPLASH_SESSION_KEY = 'sufi-splash-shown'
+const MIN_DISPLAY_MS = 600 // brief brand moment even on an instant/cached load
+const FADE_MS = 300
+const MAX_WAIT_MS = 4000 // don't block the site forever if a resource stalls
 
 export function SplashScreen() {
   const [visible, setVisible] = useState(true)
@@ -20,9 +23,32 @@ export function SplashScreen() {
       return
     }
 
-    const fadeTimer = setTimeout(() => setFading(true), 700)
-    const hideTimer = setTimeout(() => setVisible(false), 1000)
+    const start = Date.now()
+    let fadeTimer: ReturnType<typeof setTimeout>
+    let hideTimer: ReturnType<typeof setTimeout>
+    let finished = false
+
+    // Waits for the page's own load event (images, fonts, everything the
+    // initial render pulled in) rather than a fixed timer, so the splash
+    // never drops away onto a still-loading page.
+    const finish = () => {
+      if (finished) return
+      finished = true
+      const remaining = Math.max(0, MIN_DISPLAY_MS - (Date.now() - start))
+      fadeTimer = setTimeout(() => setFading(true), remaining)
+      hideTimer = setTimeout(() => setVisible(false), remaining + FADE_MS)
+    }
+
+    if (document.readyState === 'complete') {
+      finish()
+    } else {
+      window.addEventListener('load', finish)
+    }
+    const maxTimer = setTimeout(finish, MAX_WAIT_MS)
+
     return () => {
+      window.removeEventListener('load', finish)
+      clearTimeout(maxTimer)
       clearTimeout(fadeTimer)
       clearTimeout(hideTimer)
     }
