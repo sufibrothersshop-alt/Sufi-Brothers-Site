@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { banCustomer, unbanCustomer } from '@/app/admin/actions'
 import { OrderCard, type OrderRow } from '@/components/admin/order-card'
 import { StatTile } from '@/components/admin/stat-tile'
+import { AutoRefresh } from '@/components/admin/auto-refresh'
 
 type CustomerRow = {
   phone: string
@@ -50,6 +51,9 @@ export default async function CustomerDetailPage({
             <p className="text-sm font-bold uppercase tracking-[0.15em] text-primary">Customer profile</p>
             <h1 className="mt-1 font-serif text-3xl font-black">{customer.phone}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{customer.name ?? 'No name on file'} · Customer since {new Date(customer.created_at).toLocaleDateString()}</p>
+            <div className="mt-2">
+              <AutoRefresh intervalMs={15000} />
+            </div>
           </div>
           {customer.is_banned ? (
             <form action={unbanCustomer.bind(null, customer.phone)} className="flex flex-col items-end gap-1">

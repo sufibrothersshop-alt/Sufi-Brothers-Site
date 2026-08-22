@@ -5,6 +5,7 @@ import { banCustomer, signOut, unbanCustomer } from '@/app/admin/actions'
 import { OrderCard, type OrderRow } from '@/components/admin/order-card'
 import { StatTile } from '@/components/admin/stat-tile'
 import { MenuAvailabilitySection } from '@/components/admin/menu-availability'
+import { AutoRefresh } from '@/components/admin/auto-refresh'
 
 const RECENT_ORDERS_LIMIT = 50
 const CUSTOMERS_LIMIT = 50
@@ -60,6 +61,9 @@ export default async function AdminPage({
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.15em] text-primary">Sufi Brothers</p>
             <h1 className="mt-1 font-serif text-3xl font-black">Admin dashboard</h1>
+            <div className="mt-2">
+              <AutoRefresh intervalMs={15000} />
+            </div>
           </div>
           <form action={signOut}>
             <button type="submit" className="rounded-xl border border-border px-4 py-2.5 text-sm font-bold transition hover:bg-secondary">Sign out</button>
