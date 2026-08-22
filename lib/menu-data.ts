@@ -108,7 +108,7 @@ export const menuItems: MenuItem[] = [
   { id: 58, category: 'Juices & Shakes', name: 'Malta Juice', subtitle: 'مالٹا جوس', price: 180, image: '/Juices/orange-juice.png' },
 
   // Cold Drinks
-  { id: 59, category: 'Cold Drinks', name: 'Cola Next (Regular)', subtitle: 'کولا نیکسٹ ریگولر', price: 80, image: null },
-  { id: 60, category: 'Cold Drinks', name: 'Cola Next (1 Ltr)', subtitle: 'کولا نیکسٹ 1 لیٹر', price: 160, image: null },
-  { id: 61, category: 'Cold Drinks', name: 'Cola Next (1.5 Ltr)', subtitle: 'کولا نیکسٹ 1.5 لیٹر', price: 200, image: null },
+  { id: 59, category: 'Cold Drinks', name: 'Cola Next (Regular)', subtitle: 'کولا نیکسٹ ریگولر', price: 80, image: '/drinks/cola-regular.png' },
+  { id: 60, category: 'Cold Drinks', name: 'Cola Next (1 Ltr)', subtitle: 'کولا نیکسٹ 1 لیٹر', price: 160, image: '/drinks/cola-1.png' },
+  { id: 61, category: 'Cold Drinks', name: 'Cola Next (1.5 Ltr)', subtitle: 'کولا نیکسٹ 1.5 لیٹر', price: 200, image: '/drinks/cola-1.5.png' },
 ]

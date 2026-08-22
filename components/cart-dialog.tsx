@@ -5,6 +5,7 @@ import { Dialog } from '@base-ui/react/dialog'
 import { CheckCircle2, LocateFixed, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react'
 import type { ResolvedMenuItem } from '@/lib/use-resolved-menu'
 import { createClient } from '@/lib/supabase/client'
+import { useRememberedCustomer } from '@/lib/use-remembered-customer'
 
 const DELIVERY_FEE = 100
 const FREE_DELIVERY_THRESHOLD = 1000
@@ -30,9 +31,11 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, onIncrement, o
   const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE
   const total = subtotal + deliveryFee
 
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
+  const [customerInfo, setCustomerInfo] = useRememberedCustomer()
+  const { name, phone, address } = customerInfo
+  const setName = (value: string) => setCustomerInfo((c) => ({ ...c, name: value }))
+  const setPhone = (value: string) => setCustomerInfo((c) => ({ ...c, phone: value }))
+  const setAddress = (value: string) => setCustomerInfo((c) => ({ ...c, address: value }))
   const [notes, setNotes] = useState('')
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [locating, setLocating] = useState(false)
