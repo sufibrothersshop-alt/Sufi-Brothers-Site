@@ -44,6 +44,25 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, onIncrement, o
   const [error, setError] = useState<string | null>(null)
   const [orderId, setOrderId] = useState<string | null>(null)
 
+  // Recognizes a returning customer across devices: once a phone number
+  // looks complete, ask the database (not just this browser's storage) for
+  // their saved name/address and fill in whatever's still blank.
+  useEffect(() => {
+    if (!open || phone.trim().length < 10) return
+    const timeout = setTimeout(async () => {
+      const supabase = createClient()
+      const { data } = await supabase.rpc('get_customer_info', { p_phone: phone.trim() })
+      const match = data?.[0]
+      if (!match) return
+      setCustomerInfo((c) => ({
+        name: c.name || match.name || '',
+        phone: c.phone,
+        address: c.address || match.delivery_address || '',
+      }))
+    }, 600)
+    return () => clearTimeout(timeout)
+  }, [open, phone, setCustomerInfo])
+
   useEffect(() => {
     if (open) {
       setError(null)

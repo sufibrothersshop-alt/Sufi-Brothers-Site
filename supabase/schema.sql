@@ -250,6 +250,42 @@ $$;
 grant execute on function public.place_order(text, text, text, text, jsonb, double precision, double precision) to anon, authenticated;
 
 -- =========================================================
+-- get_customer_info — lets the checkout form recognize a returning
+-- customer across devices (not just this browser's localStorage): given an
+-- EXACT phone number, returns their saved name and most recent delivery
+-- address so those fields can be pre-filled.
+--
+-- This intentionally reveals nothing else (no order history, no ban
+-- status, no way to browse/enumerate customers) and only ever returns data
+-- for the exact number the caller already has — someone would need to
+-- already know/guess a specific customer's phone number to get anything
+-- back, the same way any "recognize returning caller" lookup works.
+-- Banned numbers get no match, so the checkout form treats them as unknown.
+-- =========================================================
+create or replace function public.get_customer_info(p_phone text)
+returns table (name text, delivery_address text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  select c.name, o.delivery_address
+  from public.customers c
+  left join lateral (
+    select o2.delivery_address
+    from public.orders o2
+    where o2.customer_phone = c.phone and o2.delivery_address is not null
+    order by o2.created_at desc
+    limit 1
+  ) o on true
+  where c.phone = trim(p_phone) and c.is_banned = false;
+end;
+$$;
+
+grant execute on function public.get_customer_info(text) to anon, authenticated;
+
+-- =========================================================
 -- Admin login setup: nothing to run here. Set ADMIN_USERNAME, ADMIN_PASSWORD,
 -- and ADMIN_SESSION_SECRET in .env.local — see .env.example.
 -- =========================================================
