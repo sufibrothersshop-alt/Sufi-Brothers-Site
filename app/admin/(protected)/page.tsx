@@ -36,8 +36,8 @@ export default async function AdminOrdersPage() {
         <form action={setDeliveryEnabled.bind(null, !deliveryEnabled)}>
           <button
             type="submit"
-            className={`rounded-xl px-5 py-2.5 text-sm font-bold shadow-md transition hover:brightness-110 ${
-              deliveryEnabled ? 'bg-destructive text-white shadow-destructive/20' : 'bg-primary text-primary-foreground shadow-primary/20'
+            className={`rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-110 ${
+              deliveryEnabled ? 'bg-destructive shadow-destructive/20' : 'bg-green-600 shadow-green-600/20'
             }`}
           >
             {deliveryEnabled ? 'Turn delivery off' : 'Turn delivery on'}
