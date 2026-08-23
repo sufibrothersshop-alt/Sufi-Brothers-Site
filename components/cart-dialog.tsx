@@ -15,6 +15,7 @@ type CartDialogProps = {
   onOpenChange: (open: boolean) => void
   menuItems: ResolvedMenuItem[]
   cart: Record<number, number>
+  deliveryEnabled: boolean
   onIncrement: (id: number) => void
   onDecrement: (id: number) => void
   onRemove: (id: number) => void
@@ -22,7 +23,7 @@ type CartDialogProps = {
   onOrderPlaced?: (orderId: string, total: number) => void
 }
 
-export function CartDialog({ open, onOpenChange, menuItems, cart, onIncrement, onDecrement, onRemove, onClear, onOrderPlaced }: CartDialogProps) {
+export function CartDialog({ open, onOpenChange, menuItems, cart, deliveryEnabled, onIncrement, onDecrement, onRemove, onClear, onOrderPlaced }: CartDialogProps) {
   const lines = Object.entries(cart)
     .map(([id, quantity]) => ({ dish: menuItems.find((item) => item.id === Number(id)), quantity }))
     .filter((line): line is { dish: NonNullable<typeof line.dish>; quantity: number } => !!line.dish && line.quantity > 0)
@@ -211,13 +212,19 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, onIncrement, o
                     <span>Rs. {total}</span>
                   </div>
                 </div>
-                <button
-                  onClick={placeOrder}
-                  disabled={submitting}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-md shadow-primary/20 transition hover:brightness-110 disabled:opacity-60"
-                >
-                  {submitting ? 'Placing order…' : `Place order · Rs. ${total}`}
-                </button>
+                {deliveryEnabled ? (
+                  <button
+                    onClick={placeOrder}
+                    disabled={submitting}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-md shadow-primary/20 transition hover:brightness-110 disabled:opacity-60"
+                  >
+                    {submitting ? 'Placing order…' : `Place order · Rs. ${total}`}
+                  </button>
+                ) : (
+                  <p className="rounded-xl bg-destructive/10 px-4 py-3.5 text-center text-sm font-bold text-destructive">
+                    Sorry for the inconvenience! Delivery is off right now — please check back later.
+                  </p>
+                )}
               </div>
             )}
           </Dialog.Popup>

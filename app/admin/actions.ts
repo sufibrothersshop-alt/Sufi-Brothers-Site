@@ -117,3 +117,10 @@ export async function setRiderActive(riderId: string, isActive: boolean) {
   revalidatePath('/admin/riders')
   revalidatePath('/admin')
 }
+
+export async function setDeliveryEnabled(enabled: boolean) {
+  await requireAdmin()
+  const admin = createAdminClient()
+  await admin.from('site_settings').update({ delivery_enabled: enabled }).eq('id', 1)
+  revalidatePath('/admin')
+}

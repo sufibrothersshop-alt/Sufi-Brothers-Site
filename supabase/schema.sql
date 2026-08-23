@@ -34,6 +34,19 @@ create table if not exists public.riders (
 );
 
 -- =========================================================
+-- site_settings — single-row global switches, set from the admin panel.
+-- Right now just the delivery on/off toggle.
+-- =========================================================
+create table if not exists public.site_settings (
+  id               integer primary key default 1,
+  delivery_enabled boolean not null default true,
+  updated_at       timestamptz not null default now(),
+  constraint site_settings_singleton check (id = 1)
+);
+
+insert into public.site_settings (id) values (1) on conflict (id) do nothing;
+
+-- =========================================================
 -- orders
 -- =========================================================
 create table if not exists public.orders (
@@ -133,6 +146,11 @@ create trigger trg_menu_availability_updated_at
   before update on public.menu_availability
   for each row execute function public.set_updated_at();
 
+drop trigger if exists trg_site_settings_updated_at on public.site_settings;
+create trigger trg_site_settings_updated_at
+  before update on public.site_settings
+  for each row execute function public.set_updated_at();
+
 -- =========================================================
 -- Row Level Security — locked down by default.
 -- No policies are granted to anon/authenticated: the public site can only
@@ -141,19 +159,28 @@ create trigger trg_menu_availability_updated_at
 -- RLS entirely). This keeps customer data and the ban list unreadable from
 -- the browser under all circumstances.
 --
--- menu_availability is the one exception: it's non-sensitive (just item_id
--- + in-stock flag) and the public site needs to read it directly to grey
--- out sold-out items, so it gets a public SELECT policy.
+-- menu_availability and site_settings are the exceptions: neither is
+-- sensitive (an in-stock flag and a single delivery on/off switch), and the
+-- public site needs to read both directly, so they get public SELECT
+-- policies.
 -- =========================================================
 alter table public.customers enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
 alter table public.riders enable row level security;
 alter table public.menu_availability enable row level security;
+alter table public.site_settings enable row level security;
 
 drop policy if exists "menu availability is publicly readable" on public.menu_availability;
 create policy "menu availability is publicly readable"
   on public.menu_availability
+  for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "site settings are publicly readable" on public.site_settings;
+create policy "site settings are publicly readable"
+  on public.site_settings
   for select
   to anon, authenticated
   using (true);
@@ -197,6 +224,10 @@ declare
   v_total          numeric(10, 2);
   v_sold_out_names text;
 begin
+  if not coalesce((select delivery_enabled from public.site_settings where id = 1), true) then
+    raise exception 'Sorry, we are not taking orders right now. Please try again later.';
+  end if;
+
   if p_phone is null or char_length(trim(p_phone)) < 7 then
     raise exception 'A valid phone number is required.';
   end if;

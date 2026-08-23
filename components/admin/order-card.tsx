@@ -65,7 +65,40 @@ function buildCustomerMessage(order: OrderRow) {
   return lines.filter((line) => line !== null).join('\n')
 }
 
+const COMPACT_STATUSES = new Set(['delivered', 'cancelled'])
+
 export function OrderCard({ order, riders, showCustomer = true }: { order: OrderRow; riders: RiderInfo[]; showCustomer?: boolean }) {
+  if (COMPACT_STATUSES.has(order.status)) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-2.5 text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          {showCustomer ? (
+            <Link href={`/admin/customers/${encodeURIComponent(order.customer_phone)}`} className="font-bold text-primary hover:underline">
+              {order.customer_phone}
+            </Link>
+          ) : (
+            <span className="font-bold">Order #{order.id.slice(0, 8)}</span>
+          )}
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${STATUS_BADGE[order.status] ?? 'bg-secondary text-secondary-foreground'}`}>
+            {STATUS_LABELS[order.status] ?? order.status}
+          </span>
+          <span className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="font-bold text-primary">Rs. {order.total_amount}</span>
+          <form action={updateOrderStatus.bind(null, order.id)} className="flex items-center gap-1.5">
+            <select name="status" defaultValue={order.status} className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-bold">
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <button type="submit" className="rounded-lg border border-border px-2 py-1 text-xs font-bold transition hover:bg-secondary">Update</button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">

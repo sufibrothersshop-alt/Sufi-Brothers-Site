@@ -19,11 +19,14 @@ import { categories as menuCategories, categoryEmoji } from '@/lib/menu-data'
 import { DishDialog } from '@/components/dish-dialog'
 import { CartDialog } from '@/components/cart-dialog'
 import { OrderTrackerWidget } from '@/components/order-tracker-widget'
+import { DeliveryOffBanner } from '@/components/delivery-off-banner'
 import { useResolvedMenu, type ResolvedMenuItem } from '@/lib/use-resolved-menu'
 import { useOrderTracker } from '@/lib/use-order-tracker'
+import { useDeliveryStatus } from '@/lib/use-delivery-status'
 
 export default function Page() {
   const menuItems = useResolvedMenu()
+  const deliveryEnabled = useDeliveryStatus()
   const [activeCategory, setActiveCategory] = useState<string>(menuCategories[0])
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<Record<number, number>>({})
@@ -60,6 +63,7 @@ export default function Page() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
+      {!deliveryEnabled && <DeliveryOffBanner />}
       <div className="bg-primary px-4 py-2 text-center text-xs font-semibold tracking-wide text-primary-foreground sm:text-sm">
         Free delivery in Ghouri Town on orders above Rs. 1000 <span className="mx-2 opacity-50">•</span> Call us: 0344-7575657
       </div>
@@ -114,6 +118,7 @@ export default function Page() {
         onOpenChange={setCartOpen}
         menuItems={menuItems}
         cart={cart}
+        deliveryEnabled={deliveryEnabled}
         onIncrement={incrementCartItem}
         onDecrement={decrementCartItem}
         onRemove={removeCartItem}
