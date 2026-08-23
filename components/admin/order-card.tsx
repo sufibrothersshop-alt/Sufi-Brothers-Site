@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { MessageCircle } from 'lucide-react'
-import { assignRider, updateOrderStatus } from '@/app/admin/actions'
+import { MessageCircle, Printer } from 'lucide-react'
+import { assignRider } from '@/app/admin/actions'
+import { OrderStatusForm } from '@/components/admin/order-status-form'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -86,14 +87,7 @@ export function OrderCard({ order, riders, showCustomer = true }: { order: Order
         </div>
         <div className="flex items-center gap-3">
           <span className="font-bold text-primary">Rs. {order.total_amount}</span>
-          <form action={updateOrderStatus.bind(null, order.id)} className="flex items-center gap-1.5">
-            <select name="status" defaultValue={order.status} className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-bold">
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-            <button type="submit" className="rounded-lg border border-border px-2 py-1 text-xs font-bold transition hover:bg-secondary">Update</button>
-          </form>
+          <OrderStatusForm orderId={order.id} currentStatus={order.status} compact />
         </div>
       </div>
     )
@@ -131,14 +125,15 @@ export function OrderCard({ order, riders, showCustomer = true }: { order: Order
         </div>
         <div className="text-right">
           <p className="font-serif text-xl font-black text-primary">Rs. {order.total_amount}</p>
-          <form action={updateOrderStatus.bind(null, order.id)} className="mt-2 flex items-center gap-2">
-            <select name="status" defaultValue={order.status} className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs font-bold">
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-            <button type="submit" className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">Update</button>
-          </form>
+          <OrderStatusForm orderId={order.id} currentStatus={order.status} />
+          <a
+            href={`/admin/print/${order.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 flex items-center justify-end gap-1 text-xs font-bold text-muted-foreground hover:text-foreground"
+          >
+            <Printer className="size-3.5" /> Print slip
+          </a>
         </div>
       </div>
 
