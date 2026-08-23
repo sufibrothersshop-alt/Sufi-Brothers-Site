@@ -1,15 +1,42 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { menuItems } from '@/lib/menu-data'
 
 const SPLASH_SESSION_KEY = 'sufi-splash-shown'
 const MIN_DISPLAY_MS = 600 // brief brand moment even on an instant/cached load
 const FADE_MS = 300
-const MAX_WAIT_MS = 4000 // don't block the site forever if a resource stalls
+const MAX_WAIT_MS = 8000 // don't block the site forever if a resource stalls
+
+function preloadImages(onProgress: (loaded: number, total: number) => void) {
+  const paths = Array.from(new Set(menuItems.map((item) => item.image).filter((src): src is string => !!src)))
+  if (paths.length === 0) return Promise.resolve()
+
+  let loaded = 0
+  onProgress(0, paths.length)
+
+  return Promise.all(
+    paths.map(
+      (src) =>
+        new Promise<void>((resolve) => {
+          const img = new window.Image()
+          const done = () => {
+            loaded += 1
+            onProgress(loaded, paths.length)
+            resolve()
+          }
+          img.onload = done
+          img.onerror = done
+          img.src = src
+        })
+    )
+  )
+}
 
 export function SplashScreen() {
   const [visible, setVisible] = useState(true)
   const [fading, setFading] = useState(false)
+  const [progress, setProgress] = useState({ loaded: 0, total: 0 })
 
   useEffect(() => {
     if (sessionStorage.getItem(SPLASH_SESSION_KEY)) {
@@ -28,9 +55,6 @@ export function SplashScreen() {
     let hideTimer: ReturnType<typeof setTimeout>
     let finished = false
 
-    // Waits for the page's own load event (images, fonts, everything the
-    // initial render pulled in) rather than a fixed timer, so the splash
-    // never drops away onto a still-loading page.
     const finish = () => {
       if (finished) return
       finished = true
@@ -39,15 +63,19 @@ export function SplashScreen() {
       hideTimer = setTimeout(() => setVisible(false), remaining + FADE_MS)
     }
 
-    if (document.readyState === 'complete') {
-      finish()
-    } else {
-      window.addEventListener('load', finish)
-    }
+    // Waits for both the page's own load event AND every menu photo to be
+    // fully fetched — not just what's in the default category's DOM — so
+    // switching tabs right after the splash never shows a loading pop-in.
+    const pageLoaded = new Promise<void>((resolve) => {
+      if (document.readyState === 'complete') resolve()
+      else window.addEventListener('load', () => resolve(), { once: true })
+    })
+
+    Promise.all([pageLoaded, preloadImages((loaded, total) => setProgress({ loaded, total }))]).then(finish)
+
     const maxTimer = setTimeout(finish, MAX_WAIT_MS)
 
     return () => {
-      window.removeEventListener('load', finish)
       clearTimeout(maxTimer)
       clearTimeout(fadeTimer)
       clearTimeout(hideTimer)
@@ -78,6 +106,16 @@ export function SplashScreen() {
         <p className="font-serif text-2xl font-black text-primary-foreground">Sufi Brothers</p>
         <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.25em] text-primary-foreground/70">Fast food &amp; more</p>
       </div>
+      {progress.total > 0 && (
+        <div className="mt-2 w-40">
+          <div className="h-1 overflow-hidden rounded-full bg-primary-foreground/20">
+            <div
+              className="h-full rounded-full bg-secondary transition-all duration-200"
+              style={{ width: `${Math.round((progress.loaded / progress.total) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
