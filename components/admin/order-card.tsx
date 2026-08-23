@@ -1,5 +1,7 @@
 import Link from 'next/link'
-import { updateOrderStatus } from '@/app/admin/actions'
+import { MessageCircle } from 'lucide-react'
+import { assignRider, updateOrderStatus } from '@/app/admin/actions'
+import { buildWhatsAppLink } from '@/lib/whatsapp'
 
 export const STATUS_LABELS: Record<string, string> = {
   pending: 'Pending',
@@ -20,6 +22,7 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 export type OrderItemRow = { id: string; item_name: string; quantity: number; unit_price: number; line_total: number }
+export type RiderInfo = { id: string; name: string; phone: string }
 export type OrderRow = {
   id: string
   customer_phone: string
@@ -32,9 +35,37 @@ export type OrderRow = {
   total_amount: number
   created_at: string
   order_items: OrderItemRow[]
+  rider_id: string | null
+  rider: RiderInfo | null
 }
 
-export function OrderCard({ order, showCustomer = true }: { order: OrderRow; showCustomer?: boolean }) {
+function buildRiderMessage(order: OrderRow) {
+  const lines = [
+    `New delivery — Order #${order.id.slice(0, 8)}`,
+    `Customer: ${order.customer_phone}`,
+    order.delivery_address ? `Address: ${order.delivery_address}` : null,
+    order.latitude != null && order.longitude != null ? `Map: https://www.google.com/maps?q=${order.latitude},${order.longitude}` : null,
+    '',
+    'Items:',
+    ...order.order_items.map((item) => `${item.quantity} x ${item.item_name}`),
+    '',
+    `Total: Rs. ${order.total_amount}`,
+    order.notes ? `Note: ${order.notes}` : null,
+  ]
+  return lines.filter((line) => line !== null).join('\n')
+}
+
+function buildCustomerMessage(order: OrderRow) {
+  const lines = [
+    `Hi! Your Sufi Brothers order #${order.id.slice(0, 8)} is on the way.`,
+    order.rider ? `Rider: ${order.rider.name} (${order.rider.phone})` : null,
+    `Total: Rs. ${order.total_amount}`,
+    'Thank you for ordering with us!',
+  ]
+  return lines.filter((line) => line !== null).join('\n')
+}
+
+export function OrderCard({ order, riders, showCustomer = true }: { order: OrderRow; riders: RiderInfo[]; showCustomer?: boolean }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -77,6 +108,7 @@ export function OrderCard({ order, showCustomer = true }: { order: OrderRow; sho
           </form>
         </div>
       </div>
+
       <ul className="mt-3 flex flex-col gap-1 border-t border-border pt-3 text-sm">
         {order.order_items.map((item) => (
           <li key={item.id} className="flex justify-between text-muted-foreground">
@@ -89,6 +121,39 @@ export function OrderCard({ order, showCustomer = true }: { order: OrderRow; sho
           <span>{order.delivery_fee > 0 ? `Rs. ${order.delivery_fee}` : 'Free'}</span>
         </li>
       </ul>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+        <form action={assignRider.bind(null, order.id)} className="flex items-center gap-2">
+          <select name="rider_id" defaultValue={order.rider_id ?? ''} className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs font-bold">
+            <option value="">No rider assigned</option>
+            {riders.map((rider) => (
+              <option key={rider.id} value={rider.id}>{rider.name}</option>
+            ))}
+          </select>
+          <button type="submit" className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold transition hover:bg-secondary">Assign</button>
+        </form>
+
+        {order.rider && (
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={buildWhatsAppLink(order.rider.phone, buildRiderMessage(order))}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-bold text-secondary-foreground transition hover:brightness-95"
+            >
+              <MessageCircle className="size-3.5" /> Message {order.rider.name}
+            </a>
+            <a
+              href={buildWhatsAppLink(order.customer_phone, buildCustomerMessage(order))}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-bold transition hover:bg-secondary"
+            >
+              <MessageCircle className="size-3.5" /> Message customer
+            </a>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

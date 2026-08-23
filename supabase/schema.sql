@@ -23,6 +23,17 @@ create table if not exists public.customers (
 );
 
 -- =========================================================
+-- riders — delivery staff, managed from the admin panel
+-- =========================================================
+create table if not exists public.riders (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  phone      text not null,
+  is_active  boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+-- =========================================================
 -- orders
 -- =========================================================
 create table if not exists public.orders (
@@ -44,9 +55,11 @@ create table if not exists public.orders (
 alter table public.orders add column if not exists latitude double precision;
 alter table public.orders add column if not exists longitude double precision;
 alter table public.orders add column if not exists delivery_fee numeric(10, 2) not null default 0;
+alter table public.orders add column if not exists rider_id uuid references public.riders(id);
 
 create index if not exists idx_orders_customer_phone on public.orders (customer_phone);
 create index if not exists idx_orders_status on public.orders (status);
+create index if not exists idx_orders_rider_id on public.orders (rider_id);
 create index if not exists idx_orders_created_at on public.orders (created_at desc);
 
 -- =========================================================
@@ -135,6 +148,7 @@ create trigger trg_menu_availability_updated_at
 alter table public.customers enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
+alter table public.riders enable row level security;
 alter table public.menu_availability enable row level security;
 
 drop policy if exists "menu availability is publicly readable" on public.menu_availability;
@@ -284,6 +298,31 @@ end;
 $$;
 
 grant execute on function public.get_customer_info(text) to anon, authenticated;
+
+-- =========================================================
+-- get_order_status — lets the customer's own order-tracker widget poll for
+-- real progress (status + assigned rider) instead of guessing purely from
+-- a timer. Takes the order's own id as the lookup key, which acts like a
+-- receipt number: an unguessable UUID the customer already has from
+-- place_order's return value, not something that lets you browse other
+-- people's orders.
+-- =========================================================
+create or replace function public.get_order_status(p_order_id uuid)
+returns table (status text, rider_name text, rider_phone text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  select o.status, r.name, r.phone
+  from public.orders o
+  left join public.riders r on r.id = o.rider_id
+  where o.id = p_order_id;
+end;
+$$;
+
+grant execute on function public.get_order_status(uuid) to anon, authenticated;
 
 -- =========================================================
 -- Admin login setup: nothing to run here. Set ADMIN_USERNAME, ADMIN_PASSWORD,

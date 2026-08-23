@@ -128,6 +128,9 @@ export default function Page() {
           remainingMinutes={orderTracker.remainingMinutes}
           currentPhaseIndex={orderTracker.currentPhaseIndex}
           isDelivered={orderTracker.isDelivered}
+          isCancelled={orderTracker.isCancelled}
+          riderName={orderTracker.riderName}
+          riderPhone={orderTracker.riderPhone}
           onDismiss={orderTracker.clearTracking}
         />
       )}

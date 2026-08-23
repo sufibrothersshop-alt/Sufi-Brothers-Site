@@ -40,7 +40,7 @@ export async function banCustomer(phone: string, formData: FormData) {
     .from('customers')
     .update({ is_banned: true, ban_reason: reason || null, banned_at: new Date().toISOString() })
     .eq('phone', phone)
-  revalidatePath('/admin')
+  revalidatePath('/admin/customers')
   revalidatePath(`/admin/customers/${encodeURIComponent(phone)}`)
 }
 
@@ -51,7 +51,7 @@ export async function unbanCustomer(phone: string) {
     .from('customers')
     .update({ is_banned: false, ban_reason: null, banned_at: null })
     .eq('phone', phone)
-  revalidatePath('/admin')
+  revalidatePath('/admin/customers')
   revalidatePath(`/admin/customers/${encodeURIComponent(phone)}`)
 }
 
@@ -67,11 +67,20 @@ export async function updateOrderStatus(orderId: string, formData: FormData) {
   revalidatePath('/admin/customers/[phone]', 'page')
 }
 
+export async function assignRider(orderId: string, formData: FormData) {
+  await requireAdmin()
+  const riderId = String(formData.get('rider_id') ?? '').trim()
+  const admin = createAdminClient()
+  await admin.from('orders').update({ rider_id: riderId || null }).eq('id', orderId)
+  revalidatePath('/admin')
+  revalidatePath('/admin/customers/[phone]', 'page')
+}
+
 export async function setItemAvailability(itemId: number, isAvailable: boolean) {
   await requireAdmin()
   const admin = createAdminClient()
   await admin.from('menu_availability').upsert({ item_id: itemId, is_available: isAvailable })
-  revalidatePath('/admin')
+  revalidatePath('/admin/menu')
 }
 
 export async function updateItemPrice(itemId: number, formData: FormData) {
@@ -80,12 +89,31 @@ export async function updateItemPrice(itemId: number, formData: FormData) {
   if (!Number.isFinite(price) || price <= 0) return
   const admin = createAdminClient()
   await admin.from('menu_availability').upsert({ item_id: itemId, price_override: price })
-  revalidatePath('/admin')
+  revalidatePath('/admin/menu')
 }
 
 export async function resetItemPrice(itemId: number) {
   await requireAdmin()
   const admin = createAdminClient()
   await admin.from('menu_availability').update({ price_override: null }).eq('item_id', itemId)
+  revalidatePath('/admin/menu')
+}
+
+export async function addRider(formData: FormData) {
+  await requireAdmin()
+  const name = String(formData.get('name') ?? '').trim()
+  const phone = String(formData.get('phone') ?? '').trim()
+  if (!name || !phone) return
+  const admin = createAdminClient()
+  await admin.from('riders').insert({ name, phone })
+  revalidatePath('/admin/riders')
+  revalidatePath('/admin')
+}
+
+export async function setRiderActive(riderId: string, isActive: boolean) {
+  await requireAdmin()
+  const admin = createAdminClient()
+  await admin.from('riders').update({ is_active: isActive }).eq('id', riderId)
+  revalidatePath('/admin/riders')
   revalidatePath('/admin')
 }
