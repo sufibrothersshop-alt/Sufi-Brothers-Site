@@ -19,6 +19,7 @@ import { categories as menuCategories, categoryEmoji } from '@/lib/menu-data'
 import { DishDialog } from '@/components/dish-dialog'
 import { CartDialog } from '@/components/cart-dialog'
 import { OrderTrackerWidget } from '@/components/order-tracker-widget'
+import { SplashScreen } from '@/components/splash-screen'
 import { DeliveryOffBanner } from '@/components/delivery-off-banner'
 import { MenuImagePrefetcher } from '@/components/menu-image-prefetcher'
 import { useResolvedMenu, type ResolvedMenuItem } from '@/lib/use-resolved-menu'
@@ -64,6 +65,7 @@ export default function Page() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
+      <SplashScreen />
       <MenuImagePrefetcher />
       {!deliveryEnabled && <DeliveryOffBanner />}
       <div className="bg-primary px-4 py-2 text-center text-xs font-semibold tracking-wide text-primary-foreground sm:text-sm">
