@@ -8,7 +8,6 @@ import { createClient } from '@/lib/supabase/client'
 import { useRememberedCustomer } from '@/lib/use-remembered-customer'
 
 const DELIVERY_FEE = 100
-const FREE_DELIVERY_THRESHOLD = 1000
 
 type CartDialogProps = {
   open: boolean
@@ -29,7 +28,7 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, deliveryEnable
     .filter((line): line is { dish: NonNullable<typeof line.dish>; quantity: number } => !!line.dish && line.quantity > 0)
 
   const subtotal = lines.reduce((sum, line) => sum + line.dish.price * line.quantity, 0)
-  const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE
+  const deliveryFee = DELIVERY_FEE
   const total = subtotal + deliveryFee
 
   const [customerInfo, setCustomerInfo] = useRememberedCustomer()
@@ -202,11 +201,8 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, deliveryEnable
                   </div>
                   <div className="flex items-center justify-between text-muted-foreground">
                     <span>Delivery</span>
-                    <span>{deliveryFee === 0 ? 'Free' : `Rs. ${deliveryFee}`}</span>
+                    <span>Rs. {deliveryFee}</span>
                   </div>
-                  {deliveryFee > 0 && (
-                    <p className="text-xs text-muted-foreground/80">Add Rs. {FREE_DELIVERY_THRESHOLD - subtotal} more for free delivery</p>
-                  )}
                   <div className="mt-1 flex items-center justify-between border-t border-border pt-1.5 font-serif text-lg font-black text-primary">
                     <span>Total</span>
                     <span>Rs. {total}</span>

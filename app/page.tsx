@@ -67,7 +67,7 @@ export default function Page() {
       <MenuImagePrefetcher />
       {!deliveryEnabled && <DeliveryOffBanner />}
       <div className="bg-primary px-4 py-2 text-center text-xs font-semibold tracking-wide text-primary-foreground sm:text-sm">
-        Free delivery in Ghouri Town on orders above Rs. 1000 <span className="mx-2 opacity-50">•</span> Call us: 0344-7575657
+        Delivery in Ghouri Town — flat Rs. 100
       </div>
 
       <header className="border-b border-border bg-background/95 backdrop-blur">
