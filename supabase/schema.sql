@@ -268,9 +268,9 @@ begin
   from jsonb_array_elements(p_items) as item
   left join public.menu_availability ma on ma.item_id = (item->>'id')::integer;
 
-  -- Flat Rs. 100 delivery, no free-above-threshold exception. Decided here,
-  -- not trusted from the client, so a stale page can't send a different fee.
-  v_delivery_fee := 100;
+  -- Delivery charge isn't collected from the customer at order time — it's
+  -- confirmed over WhatsApp and set by the admin per order afterwards.
+  v_delivery_fee := 0;
   v_total := v_subtotal + v_delivery_fee;
 
   insert into public.orders (customer_phone, delivery_address, latitude, longitude, notes, delivery_fee, total_amount)

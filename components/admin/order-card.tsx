@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { MessageCircle, Printer } from 'lucide-react'
-import { assignRider } from '@/app/admin/actions'
+import { assignRider, updateDeliveryFee } from '@/app/admin/actions'
 import { OrderStatusForm } from '@/components/admin/order-status-form'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 
@@ -60,6 +60,7 @@ function buildCustomerMessage(order: OrderRow) {
   const lines = [
     `Hi! Your Sufi Brothers order #${order.id.slice(0, 8)} is on the way.`,
     order.rider ? `Rider: ${order.rider.name} (${order.rider.phone})` : null,
+    `Delivery charges: Rs. ${order.delivery_fee}`,
     `Total: Rs. ${order.total_amount}`,
     'Thank you for ordering with us!',
   ]
@@ -144,9 +145,20 @@ export function OrderCard({ order, riders, showCustomer = true }: { order: Order
             <span>Rs. {item.line_total}</span>
           </li>
         ))}
-        <li className="flex justify-between text-muted-foreground">
+        <li className="flex items-center justify-between text-muted-foreground">
           <span>Delivery</span>
-          <span>{order.delivery_fee > 0 ? `Rs. ${order.delivery_fee}` : 'Free'}</span>
+          <form action={updateDeliveryFee.bind(null, order.id)} className="flex items-center gap-1.5">
+            <span>Rs.</span>
+            <input
+              type="number"
+              name="delivery_fee"
+              min={0}
+              step={1}
+              defaultValue={order.delivery_fee}
+              className="w-16 rounded-lg border border-border bg-background px-2 py-1 text-xs font-bold text-foreground"
+            />
+            <button type="submit" className="rounded-lg border border-border px-2 py-1 text-xs font-bold transition hover:bg-secondary">Set</button>
+          </form>
         </li>
       </ul>
 

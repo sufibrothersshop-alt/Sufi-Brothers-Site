@@ -67,6 +67,18 @@ export async function updateOrderStatus(orderId: string, formData: FormData) {
   revalidatePath('/admin/customers/[phone]', 'page')
 }
 
+export async function updateDeliveryFee(orderId: string, formData: FormData) {
+  await requireAdmin()
+  const fee = Number(formData.get('delivery_fee'))
+  if (!Number.isFinite(fee) || fee < 0) return
+  const admin = createAdminClient()
+  const { data: items } = await admin.from('order_items').select('line_total').eq('order_id', orderId)
+  const subtotal = (items ?? []).reduce((sum, item) => sum + Number(item.line_total), 0)
+  await admin.from('orders').update({ delivery_fee: fee, total_amount: subtotal + fee }).eq('id', orderId)
+  revalidatePath('/admin')
+  revalidatePath('/admin/customers/[phone]', 'page')
+}
+
 export async function assignRider(orderId: string, formData: FormData) {
   await requireAdmin()
   const riderId = String(formData.get('rider_id') ?? '').trim()

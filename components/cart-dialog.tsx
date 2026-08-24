@@ -7,8 +7,6 @@ import type { ResolvedMenuItem } from '@/lib/use-resolved-menu'
 import { createClient } from '@/lib/supabase/client'
 import { useRememberedCustomer } from '@/lib/use-remembered-customer'
 
-const DELIVERY_FEE = 100
-
 type CartDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -28,8 +26,7 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, deliveryEnable
     .filter((line): line is { dish: NonNullable<typeof line.dish>; quantity: number } => !!line.dish && line.quantity > 0)
 
   const subtotal = lines.reduce((sum, line) => sum + line.dish.price * line.quantity, 0)
-  const deliveryFee = DELIVERY_FEE
-  const total = subtotal + deliveryFee
+  const total = subtotal
 
   const [customerInfo, setCustomerInfo] = useRememberedCustomer()
   const { name, phone, address } = customerInfo
@@ -195,18 +192,11 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, deliveryEnable
                   <button onClick={onClear} className="text-xs font-bold text-muted-foreground underline">Clear cart</button>
                 </div>
                 <div className="mb-4 flex flex-col gap-1.5 rounded-xl bg-secondary/20 px-4 py-3 text-sm">
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span>Subtotal</span>
-                    <span>Rs. {subtotal}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span>Delivery</span>
-                    <span>Rs. {deliveryFee}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between border-t border-border pt-1.5 font-serif text-lg font-black text-primary">
+                  <div className="flex items-center justify-between font-serif text-lg font-black text-primary">
                     <span>Total</span>
                     <span>Rs. {total}</span>
                   </div>
+                  <p className="text-xs text-muted-foreground">Delivery charges will be added and confirmed in your order WhatsApp message.</p>
                 </div>
                 {deliveryEnabled ? (
                   <button

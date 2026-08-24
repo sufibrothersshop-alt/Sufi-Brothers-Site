@@ -69,7 +69,7 @@ export default function Page() {
       <MenuImagePrefetcher />
       {!deliveryEnabled && <DeliveryOffBanner />}
       <div className="bg-primary px-4 py-2 text-center text-xs font-semibold tracking-wide text-primary-foreground sm:text-sm">
-        Delivery in Ghouri Town — flat Rs. 100
+        Delivery in Ghouri Town — charges confirmed via WhatsApp
       </div>
 
       <header className="border-b border-border bg-background/95 backdrop-blur">
