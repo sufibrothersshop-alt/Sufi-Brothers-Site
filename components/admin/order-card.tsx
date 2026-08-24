@@ -88,7 +88,7 @@ export function OrderCard({ order, riders, showCustomer = true }: { order: Order
         </div>
         <div className="flex items-center gap-3">
           <span className="font-bold text-primary">Rs. {order.total_amount}</span>
-          <OrderStatusForm orderId={order.id} currentStatus={order.status} compact />
+          <OrderStatusForm orderId={order.id} currentStatus={order.status} deliveryFee={order.delivery_fee} compact />
         </div>
       </div>
     )
@@ -126,7 +126,7 @@ export function OrderCard({ order, riders, showCustomer = true }: { order: Order
         </div>
         <div className="text-right">
           <p className="font-serif text-xl font-black text-primary">Rs. {order.total_amount}</p>
-          <OrderStatusForm orderId={order.id} currentStatus={order.status} />
+          <OrderStatusForm orderId={order.id} currentStatus={order.status} deliveryFee={order.delivery_fee} />
           <a
             href={`/admin/print/${order.id}`}
             target="_blank"

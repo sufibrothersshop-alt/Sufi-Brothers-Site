@@ -56,12 +56,17 @@ export async function unbanCustomer(phone: string) {
 }
 
 const ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'] as const
+const STATUSES_REQUIRING_FEE = new Set(['confirmed', 'preparing', 'out_for_delivery', 'delivered'])
 
 export async function updateOrderStatus(orderId: string, formData: FormData) {
   await requireAdmin()
   const status = String(formData.get('status') ?? '')
   if (!ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number])) return
   const admin = createAdminClient()
+  if (STATUSES_REQUIRING_FEE.has(status)) {
+    const { data: order } = await admin.from('orders').select('delivery_fee').eq('id', orderId).single()
+    if (!order || Number(order.delivery_fee) <= 0) return
+  }
   await admin.from('orders').update({ status }).eq('id', orderId)
   revalidatePath('/admin')
   revalidatePath('/admin/customers/[phone]', 'page')
