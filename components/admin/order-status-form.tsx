@@ -8,14 +8,6 @@ export function OrderStatusForm({ orderId, currentStatus, compact = false }: { o
   const [isPending, startTransition] = useTransition()
 
   const handleSubmit = (formData: FormData) => {
-    const newStatus = String(formData.get('status') ?? '')
-    // "Cooking started" — auto-open a print-ready 80mm slip. Must happen
-    // synchronously, before any await: browsers only allow window.open to
-    // bypass the popup blocker within the original click's call stack, and
-    // that trust expires by the time an awaited server action resolves.
-    if (newStatus === 'preparing') {
-      window.open(`/admin/print/${orderId}`, '_blank', 'width=420,height=720')
-    }
     startTransition(async () => {
       await updateOrderStatus(orderId, formData)
     })

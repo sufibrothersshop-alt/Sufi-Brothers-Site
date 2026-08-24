@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { setDeliveryEnabled } from '@/app/admin/actions'
 import { OrderCard, type OrderRow, type RiderInfo } from '@/components/admin/order-card'
 import { StatTile } from '@/components/admin/stat-tile'
+import { AutoPrintNewOrders } from '@/components/admin/auto-print-new-orders'
 
 const RECENT_ORDERS_LIMIT = 50
 
@@ -25,9 +26,12 @@ export default async function AdminOrdersPage() {
   const totalOrders = orderTotals?.length ?? 0
   const pendingOrders = (orderTotals ?? []).filter((o) => o.status === 'pending').length
   const revenue = (orderTotals ?? []).filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0)
+  const pendingOrderIds = (recentOrders ?? []).filter((o) => o.status === 'pending').map((o) => o.id)
 
   return (
     <>
+      <AutoPrintNewOrders pendingOrderIds={pendingOrderIds} />
+
       <section className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-5 ${deliveryEnabled ? 'border-border bg-card' : 'border-destructive/30 bg-destructive/10'}`}>
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Delivery service</p>
