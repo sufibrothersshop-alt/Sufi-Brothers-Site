@@ -26,11 +26,13 @@ export default async function AdminOrdersPage() {
   const totalOrders = orderTotals?.length ?? 0
   const pendingOrders = (orderTotals ?? []).filter((o) => o.status === 'pending').length
   const revenue = (orderTotals ?? []).filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0)
-  const pendingOrderIds = (recentOrders ?? []).filter((o) => o.status === 'pending').map((o) => o.id)
+  const pendingOrdersForAlerts = (recentOrders ?? [])
+    .filter((o) => o.status === 'pending')
+    .map((o) => ({ id: o.id, deliveryFee: o.delivery_fee }))
 
   return (
     <>
-      <AutoPrintNewOrders pendingOrderIds={pendingOrderIds} />
+      <AutoPrintNewOrders pendingOrders={pendingOrdersForAlerts} />
 
       <section className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-5 ${deliveryEnabled ? 'border-border bg-card' : 'border-destructive/30 bg-destructive/10'}`}>
         <div>

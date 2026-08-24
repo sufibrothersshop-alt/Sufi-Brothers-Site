@@ -127,14 +127,20 @@ export function OrderCard({ order, riders, showCustomer = true }: { order: Order
         <div className="text-right">
           <p className="font-serif text-xl font-black text-primary">Rs. {order.total_amount}</p>
           <OrderStatusForm orderId={order.id} currentStatus={order.status} deliveryFee={order.delivery_fee} />
-          <a
-            href={`/admin/print/${order.id}`}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 flex items-center justify-end gap-1 text-xs font-bold text-muted-foreground hover:text-foreground"
-          >
-            <Printer className="size-3.5" /> Print slip
-          </a>
+          {order.delivery_fee > 0 ? (
+            <a
+              href={`/admin/print/${order.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 flex items-center justify-end gap-1 text-xs font-bold text-muted-foreground hover:text-foreground"
+            >
+              <Printer className="size-3.5" /> Print slip
+            </a>
+          ) : (
+            <p className="mt-2 flex items-center justify-end gap-1 text-xs font-bold text-muted-foreground/50" title="Set the delivery fee before printing">
+              <Printer className="size-3.5" /> Print slip
+            </p>
+          )}
         </div>
       </div>
 

@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-const SEEN_KEY = 'sufi-admin-printed-orders'
+// Two independent trackers: the bell rings the moment an order arrives
+// (regardless of delivery fee), but the kitchen slip only prints once a
+// delivery fee has actually been set for that order.
+const SEEN_BELL_KEY = 'sufi-admin-notified-orders'
+const SEEN_PRINT_KEY = 'sufi-admin-printed-orders'
 
 let sharedAudioCtx: AudioContext | null = null
 
@@ -37,14 +41,27 @@ function ringBell() {
   })
 }
 
-// Fires a 80mm kitchen slip and a ring-bell alert the moment a new order
-// lands — no click behind it, since it's driven by the page's own
-// background refresh, not a user gesture. window.open() would get silently
-// blocked by the popup blocker in that situation, so this prints through a
-// hidden iframe instead: the print-slip page's own window.print() call runs
-// in the iframe's own window context, which triggers the OS print dialog
-// without ever opening a new window/tab at all.
-export function AutoPrintNewOrders({ pendingOrderIds }: { pendingOrderIds: string[] }) {
+function readSeen(key: string): Set<string> | null {
+  const raw = sessionStorage.getItem(key)
+  if (raw === null) return null
+  try {
+    return new Set(JSON.parse(raw) as string[])
+  } catch {
+    return new Set()
+  }
+}
+
+export type PendingOrder = { id: string; deliveryFee: number }
+
+// Rings a bell the moment a new order lands, and separately auto-prints the
+// 80mm kitchen slip once (and only once) that order's delivery fee has been
+// set by the admin — no click behind either, since both are driven by the
+// page's own background refresh, not a user gesture. window.open() would
+// get silently blocked by the popup blocker in that situation, so printing
+// goes through a hidden iframe instead: the print-slip page's own
+// window.print() call runs in the iframe's own window context, which
+// triggers the OS print dialog without ever opening a new window/tab.
+export function AutoPrintNewOrders({ pendingOrders }: { pendingOrders: PendingOrder[] }) {
   const [printQueue, setPrintQueue] = useState<string[]>([])
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -58,33 +75,45 @@ export function AutoPrintNewOrders({ pendingOrderIds }: { pendingOrderIds: strin
     return () => document.removeEventListener('click', unlock)
   }, [])
 
+  // Bell: fires for every pending order the instant it's first seen.
   useEffect(() => {
-    const raw = sessionStorage.getItem(SEEN_KEY)
+    const allIds = pendingOrders.map((o) => o.id)
+    const seen = readSeen(SEEN_BELL_KEY)
 
-    if (raw === null) {
-      // First load this admin session — treat whatever's already pending
-      // as known, so opening /admin doesn't suddenly print (and ring) a
-      // stack of old orders. Only orders that show up after this point
-      // auto-print and ring.
-      sessionStorage.setItem(SEEN_KEY, JSON.stringify(pendingOrderIds))
+    if (seen === null) {
+      sessionStorage.setItem(SEEN_BELL_KEY, JSON.stringify(allIds))
       return
     }
 
-    let seen: Set<string>
-    try {
-      seen = new Set(JSON.parse(raw) as string[])
-    } catch {
-      seen = new Set()
-    }
-
-    const newOnes = pendingOrderIds.filter((id) => !seen.has(id))
+    const newOnes = allIds.filter((id) => !seen.has(id))
     if (newOnes.length === 0) return
 
     newOnes.forEach((id) => seen.add(id))
-    sessionStorage.setItem(SEEN_KEY, JSON.stringify(Array.from(seen)))
-    setPrintQueue((queue) => [...queue, ...newOnes])
+    sessionStorage.setItem(SEEN_BELL_KEY, JSON.stringify(Array.from(seen)))
     ringBell()
-  }, [pendingOrderIds])
+  }, [pendingOrders])
+
+  // Print: only fires once an order's delivery fee is > 0.
+  useEffect(() => {
+    const printableIds = pendingOrders.filter((o) => o.deliveryFee > 0).map((o) => o.id)
+    const seen = readSeen(SEEN_PRINT_KEY)
+
+    if (seen === null) {
+      // First load this admin session — treat whatever's already
+      // printable as known, so opening /admin doesn't suddenly print a
+      // stack of old orders. Only orders that become printable after this
+      // point auto-print.
+      sessionStorage.setItem(SEEN_PRINT_KEY, JSON.stringify(printableIds))
+      return
+    }
+
+    const newOnes = printableIds.filter((id) => !seen.has(id))
+    if (newOnes.length === 0) return
+
+    newOnes.forEach((id) => seen.add(id))
+    sessionStorage.setItem(SEEN_PRINT_KEY, JSON.stringify(Array.from(seen)))
+    setPrintQueue((queue) => [...queue, ...newOnes])
+  }, [pendingOrders])
 
   useEffect(() => {
     if (printQueue.length === 0 || !iframeRef.current) return

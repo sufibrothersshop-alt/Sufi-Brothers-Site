@@ -31,11 +31,11 @@ export function PrintSlip({ order }: { order: SlipOrder }) {
         @page { size: 80mm auto; margin: 4mm; }
         html, body { background: #fff; }
       `}</style>
-      <div className="mx-auto w-[80mm] max-w-full bg-white p-2 font-mono text-[11px] leading-relaxed text-black">
+      <div className="mx-auto w-[80mm] max-w-full bg-white p-2 font-mono text-[15px] leading-relaxed text-black">
         <div className="text-center">
-          <p className="text-sm font-bold">SUFI BROTHERS</p>
-          <p className="text-[10px]">Fast food &amp; more</p>
-          <p className="text-[10px]">Ghouri Town, Islamabad</p>
+          <p className="text-xl font-bold">SUFI BROTHERS</p>
+          <p className="text-sm">Fast food &amp; more</p>
+          <p className="text-sm">Ghouri Town, Islamabad</p>
         </div>
 
         <div className="my-2 border-t border-dashed border-black" />
@@ -50,26 +50,22 @@ export function PrintSlip({ order }: { order: SlipOrder }) {
 
         <div className="my-2 border-t border-dashed border-black" />
 
-        <table className="w-full">
-          <tbody>
-            {order.order_items.map((item, i) => (
-              <tr key={i}>
-                <td>{item.quantity}x {item.item_name}</td>
-                <td className="text-right align-top">{item.line_total}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="flex flex-col gap-1">
+          {order.order_items.map((item, i) => (
+            <div key={i} className="flex justify-between gap-2">
+              <span>{item.quantity}x {item.item_name}</span>
+              <span className="shrink-0">{item.line_total}</span>
+            </div>
+          ))}
+        </div>
 
         <div className="my-2 border-t border-dashed border-black" />
 
-        <table className="w-full">
-          <tbody>
-            <tr><td>Subtotal</td><td className="text-right">Rs. {subtotal}</td></tr>
-            <tr><td>Delivery</td><td className="text-right">{order.delivery_fee > 0 ? `Rs. ${order.delivery_fee}` : 'Free'}</td></tr>
-            <tr className="font-bold"><td>TOTAL</td><td className="text-right">Rs. {order.total_amount}</td></tr>
-          </tbody>
-        </table>
+        <div className="flex flex-col gap-1">
+          <div className="flex justify-between"><span>Subtotal</span><span>Rs. {subtotal}</span></div>
+          <div className="flex justify-between"><span>Delivery</span><span>{order.delivery_fee > 0 ? `Rs. ${order.delivery_fee}` : 'Free'}</span></div>
+          <div className="flex justify-between text-lg font-bold"><span>TOTAL</span><span>Rs. {order.total_amount}</span></div>
+        </div>
 
         {order.notes && (
           <>

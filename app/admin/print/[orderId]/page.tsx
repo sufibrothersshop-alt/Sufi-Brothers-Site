@@ -31,5 +31,9 @@ export default async function PrintSlipPage({
 
   if (!order) notFound()
 
+  if (order.delivery_fee <= 0) {
+    return <p style={{ fontFamily: 'sans-serif', padding: 16 }}>Set the delivery fee for this order before printing the slip.</p>
+  }
+
   return <PrintSlip order={order} />
 }
