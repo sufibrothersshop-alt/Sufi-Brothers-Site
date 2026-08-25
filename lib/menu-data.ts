@@ -54,6 +54,8 @@ export const menuItems: MenuItem[] = [
   { id: 14, category: 'Burgers', name: 'Anda Shami Burger', subtitle: 'انڈہ شامی برگر', price: 170, image: '/Burgers/anda-burger.png' },
   { id: 15, category: 'Burgers', name: 'Double Anda Roll Burger', subtitle: 'ڈبل انڈہ رول برگر', price: 230, image: '/Burgers/double-anda-roll-burger.png' },
   { id: 16, category: 'Burgers', name: 'Shami Kebab', subtitle: 'شامی کباب', price: 40, image: '/Burgers/shami-kabab.png' },
+  { id: 64, category: 'Burgers', name: 'Mayonnaise Small', subtitle: 'میئونیز چھوٹا', price: 30, image: '/Burgers/mayonese-small.png' },
+  { id: 65, category: 'Burgers', name: 'Mayonnaise Big', subtitle: 'میئونیز بڑا', price: 50, image: '/Burgers/mayonese-big.png' },
 
   // Fries — public/Fries
   { id: 17, category: 'Fries', name: 'Loaded Fries', subtitle: 'لوڈڈ فرائز', price: 350, image: '/Fries/loaded-fries.png' },
@@ -70,6 +72,8 @@ export const menuItems: MenuItem[] = [
   { id: 24, category: 'Shawarma & Rolls', name: 'Chicken Cheese Roll Paratha', subtitle: 'چکن چیز رول پراٹھا', price: 300, image: '/Shawarmas/chicken-roll-cheeze.png' },
   { id: 25, category: 'Shawarma & Rolls', name: 'Zinger Roll Paratha', subtitle: 'زنگر رول پراٹھا', price: 300, image: '/Shawarmas/zinger-roll.png' },
   { id: 26, category: 'Shawarma & Rolls', name: 'Zinger Cheese Roll Paratha', subtitle: 'زنگر چیز رول پراٹھا', price: 350, image: '/Shawarmas/zinger-roll-cheeze.png' },
+  { id: 66, category: 'Shawarma & Rolls', name: 'Mayonnaise Small', subtitle: 'میئونیز چھوٹا', price: 30, image: '/Burgers/mayonese-small.png' },
+  { id: 67, category: 'Shawarma & Rolls', name: 'Mayonnaise Big', subtitle: 'میئونیز بڑا', price: 50, image: '/Burgers/mayonese-big.png' },
 
   // Chicken — public/chicken
   { id: 27, category: 'Chicken', name: 'Wings (6 Pcs)', subtitle: 'ونگز 6 پیس', price: 350, image: '/chicken/wings.png' },
