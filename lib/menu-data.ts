@@ -47,7 +47,7 @@ export const menuItems: MenuItem[] = [
   { id: 8, category: 'Burgers', name: 'Zinger Cheese Burger', subtitle: 'زنگر چیز برگر', price: 450, image: '/Burgers/zinger-burger-cheeze.png' },
   { id: 9, category: 'Burgers', name: 'Chicken Patty Burger', subtitle: 'چکن پیٹی برگر', price: 280, image: '/Burgers/chicken-pattie-burger.png' },
   { id: 10, category: 'Burgers', name: 'Chicken Patty Cheese Burger', subtitle: 'چکن پیٹی چیز برگر', price: 330, image: '/Burgers/chicken-pattie-burger-cheeze.png' },
-  { id: 11, category: 'Burgers', name: 'Double Zinger Burger', subtitle: 'ڈبل زنگر برگر', price: 580, image: '/Burgers/chicken-takar-burger.png' },
+  { id: 11, category: 'Burgers', name: 'Double Taker Burger', subtitle: 'ڈبل ٹیکر برگر', price: 580, image: '/Burgers/chicken-takar-burger.png' },
   { id: 12, category: 'Burgers', name: 'Chicken Platter Burger', subtitle: 'چکن پلیٹر برگر', price: 350, image: '/Burgers/chicken-lapeta-burger.png' },
   { id: 13, category: 'Burgers', name: 'Shami Burger', subtitle: 'شامی برگر', price: 140, image: '/Burgers/shami-burger.png' },
   { id: 14, category: 'Burgers', name: 'Anda Shami Burger', subtitle: 'انڈہ شامی برگر', price: 170, image: '/Burgers/anda-burger.png' },
