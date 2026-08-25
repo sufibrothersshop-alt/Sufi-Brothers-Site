@@ -117,4 +117,9 @@ export const menuItems: MenuItem[] = [
   { id: 59, category: 'Cold Drinks', name: 'Cola Next (Regular)', subtitle: 'کولا نیکسٹ ریگولر', price: 80, image: '/drinks/cola-regular.png' },
   { id: 60, category: 'Cold Drinks', name: 'Cola Next (1 Ltr)', subtitle: 'کولا نیکسٹ 1 لیٹر', price: 160, image: '/drinks/cola-1.png' },
   { id: 61, category: 'Cold Drinks', name: 'Cola Next (1.5 Ltr)', subtitle: 'کولا نیکسٹ 1.5 لیٹر', price: 200, image: '/drinks/cola-1.5.png' },
+  { id: 68, category: 'Cold Drinks', name: 'Fizzup (Regular)', subtitle: 'فزاپ ریگولر', price: 80, image: '/drinks/fizzup-regular.png' },
+  { id: 69, category: 'Cold Drinks', name: 'Fizzup (1 Ltr)', subtitle: 'فزاپ 1 لیٹر', price: 160, image: '/drinks/fizzup-1.png' },
+  { id: 70, category: 'Cold Drinks', name: 'Fizzup (1.5 Ltr)', subtitle: 'فزاپ 1.5 لیٹر', price: 200, image: '/drinks/fizzup-1.5.png' },
+  { id: 71, category: 'Cold Drinks', name: 'Water Bottle (Small)', subtitle: 'واٹر بوتل چھوٹی', price: 60, image: '/drinks/water-small.png' },
+  { id: 72, category: 'Cold Drinks', name: 'Water Bottle (Big)', subtitle: 'واٹر بوتل بڑی', price: 120, image: '/drinks/water-large.png' },
 ]
