@@ -64,7 +64,7 @@ export const menuItems: MenuItem[] = [
   { id: 19, category: 'Shawarma & Rolls', name: 'Chicken Shawarma', subtitle: 'چکن شوارما', price: 180, image: '/Shawarmas/chicken-shawarma.png' },
   { id: 20, category: 'Shawarma & Rolls', name: 'Chicken Cheese Shawarma', subtitle: 'چکن چیز شوارما', price: 230, image: '/Shawarmas/chicken-shawarma-cheeze.png' },
   { id: 21, category: 'Shawarma & Rolls', name: 'Zinger Shawarma', subtitle: 'زنگر شوارما', price: 250, image: '/Shawarmas/zinger-shawarma.png' },
-  { id: 62, category: 'Shawarma & Rolls', name: 'Platter Shawarma', subtitle: 'پلیٹر شوارما', price: 320, image: '/Shawarmas/zinger-shawarma.png' },
+  { id: 62, category: 'Shawarma & Rolls', name: 'Platter Shawarma', subtitle: 'پلیٹر شوارما', price: 320, image: '/Shawarmas/shawarma-platter.png' },
   { id: 22, category: 'Shawarma & Rolls', name: 'Zinger Cheese Shawarma', subtitle: 'زنگر چیز شوارما', price: 300, image: '/Shawarmas/zinger-shawarma-cheeze.png' },
   { id: 23, category: 'Shawarma & Rolls', name: 'Chicken Roll Paratha', subtitle: 'چکن رول پراٹھا', price: 250, image: '/Shawarmas/chicken-roll.png' },
   { id: 24, category: 'Shawarma & Rolls', name: 'Chicken Cheese Roll Paratha', subtitle: 'چکن چیز رول پراٹھا', price: 300, image: '/Shawarmas/chicken-roll-cheeze.png' },
