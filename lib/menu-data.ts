@@ -104,6 +104,7 @@ export const menuItems: MenuItem[] = [
   { id: 45, category: 'Juices & Shakes', name: 'Falsa Juice', subtitle: 'فالسہ جوس', price: 220, image: '/Juices/falsa-juice.png' },
   { id: 46, category: 'Juices & Shakes', name: 'Pineapple Milkshake', subtitle: 'پائن ایپل ملک شیک', price: 300, image: '/Juices/pine-apple-shake.png' },
   { id: 47, category: 'Juices & Shakes', name: 'Ice Cream Milkshake', subtitle: 'آئس کریم ملک شیک', price: 220, image: '/Juices/ice-cream-shake.png' },
+  { id: 73, category: 'Juices & Shakes', name: 'Mango Milkshake', subtitle: 'آم ملک شیک', price: 220, image: '/Juices/mango-shake.png' },
   { id: 51, category: 'Juices & Shakes', name: 'Almond Milkshake', subtitle: 'آلو ملک شیک', price: 250, image: '/Juices/almond-shake.png' },
   { id: 52, category: 'Juices & Shakes', name: 'Anar Juice', subtitle: 'انار جوس', price: 300, image: '/Juices/anar-juice.png' },
   { id: 53, category: 'Juices & Shakes', name: 'Apple Juice', subtitle: 'سیب جوس', price: 300, image: '/Juices/apple-juice.png' },
