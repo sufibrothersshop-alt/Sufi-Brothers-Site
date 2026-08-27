@@ -66,7 +66,7 @@ export default function Page() {
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
       <SplashScreen />
-      <MenuImagePrefetcher />
+      <MenuImagePrefetcher images={menuItems.map((item) => item.image)} />
       {!deliveryEnabled && <DeliveryOffBanner />}
       <div className="bg-primary px-4 py-2 text-center text-xs font-semibold tracking-wide text-primary-foreground sm:text-sm">
         Delivery in Ghouri Town — charges confirmed via WhatsApp

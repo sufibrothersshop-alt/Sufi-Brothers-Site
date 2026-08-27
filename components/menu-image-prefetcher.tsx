@@ -1,16 +1,16 @@
 'use client'
 
 import { useEffect } from 'react'
-import { menuItems } from '@/lib/menu-data'
 
 // Quietly warms the browser's cache for every menu photo, one at a time,
 // well after the page is already visible — so switching categories feels
 // instant without making anyone wait through a slow splash screen first.
-export function MenuImagePrefetcher() {
+export function MenuImagePrefetcher({ images }: { images: (string | null)[] }) {
   useEffect(() => {
+    if (images.length === 0) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
-    const paths = Array.from(new Set(menuItems.map((item) => item.image).filter((src): src is string => !!src)))
+    const paths = Array.from(new Set(images.filter((src): src is string => !!src)))
     let cancelled = false
     let index = 0
 
@@ -38,7 +38,7 @@ export function MenuImagePrefetcher() {
       cancelled = true
       clearTimeout(startTimer)
     }
-  }, [])
+  }, [images.length])
 
   return null
 }

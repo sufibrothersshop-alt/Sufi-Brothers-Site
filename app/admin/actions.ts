@@ -1,5 +1,6 @@
 'use server'
 
+import { randomUUID } from 'crypto'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
@@ -96,7 +97,7 @@ export async function assignRider(orderId: string, formData: FormData) {
 export async function setItemAvailability(itemId: number, isAvailable: boolean) {
   await requireAdmin()
   const admin = createAdminClient()
-  await admin.from('menu_availability').upsert({ item_id: itemId, is_available: isAvailable })
+  await admin.from('menu_items').update({ is_available: isAvailable }).eq('id', itemId)
   revalidatePath('/admin/menu')
 }
 
@@ -105,14 +106,41 @@ export async function updateItemPrice(itemId: number, formData: FormData) {
   const price = Number(formData.get('price'))
   if (!Number.isFinite(price) || price <= 0) return
   const admin = createAdminClient()
-  await admin.from('menu_availability').upsert({ item_id: itemId, price_override: price })
+  await admin.from('menu_items').update({ price }).eq('id', itemId)
   revalidatePath('/admin/menu')
 }
 
-export async function resetItemPrice(itemId: number) {
+export async function addMenuItem(formData: FormData) {
+  await requireAdmin()
+  const category = String(formData.get('category') ?? '').trim()
+  const name = String(formData.get('name') ?? '').trim()
+  const subtitle = String(formData.get('subtitle') ?? '').trim()
+  const price = Number(formData.get('price'))
+  if (!category || !name || !Number.isFinite(price) || price <= 0) return
+
+  const admin = createAdminClient()
+
+  let image: string | null = null
+  const file = formData.get('image')
+  if (file instanceof File && file.size > 0) {
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const path = `${randomUUID()}.${ext}`
+    const { error: uploadError } = await admin.storage.from('menu-images').upload(path, file, {
+      contentType: file.type || 'image/jpeg',
+    })
+    if (!uploadError) {
+      image = admin.storage.from('menu-images').getPublicUrl(path).data.publicUrl
+    }
+  }
+
+  await admin.from('menu_items').insert({ category, name, subtitle, price, image })
+  revalidatePath('/admin/menu')
+}
+
+export async function deleteMenuItem(itemId: number) {
   await requireAdmin()
   const admin = createAdminClient()
-  await admin.from('menu_availability').update({ price_override: null }).eq('item_id', itemId)
+  await admin.from('menu_items').delete().eq('id', itemId)
   revalidatePath('/admin/menu')
 }
 

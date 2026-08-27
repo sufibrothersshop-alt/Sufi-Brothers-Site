@@ -91,15 +91,11 @@ create table if not exists public.order_items (
 create index if not exists idx_order_items_order_id on public.order_items (order_id);
 
 -- =========================================================
--- menu_availability — per-item "in stock" toggle and price override, set
--- from the admin panel. item_id matches the MenuItem.id in lib/menu-data.ts
--- (menu content itself stays in code; only availability and price need to
--- change without a deploy). Missing row or null price_override == use the
--- code-defined defaults.
+-- menu_availability — SUPERSEDED by menu_items below. Left in place (with
+-- whatever it already holds) purely so nothing breaks if something old
+-- still queries it; the app no longer reads or writes this table. New
+-- installs don't need it at all.
 -- =========================================================
--- price_override > 0 is enforced in app/admin/actions.ts (updateItemPrice) rather
--- than a table CHECK constraint, since Postgres has no ADD CONSTRAINT IF NOT
--- EXISTS and this script needs to stay safely re-runnable either way.
 create table if not exists public.menu_availability (
   item_id        integer primary key,
   is_available   boolean not null default true,
@@ -109,9 +105,122 @@ create table if not exists public.menu_availability (
 
 alter table public.menu_availability add column if not exists price_override numeric(10, 2);
 
-insert into public.menu_availability (item_id)
-select unnest(array[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61])
-on conflict (item_id) do nothing;
+-- =========================================================
+-- menu_items — the menu itself, fully admin-managed from now on (previously
+-- a hardcoded array in lib/menu-data.ts + menu_availability for the
+-- overrides). Adding/renaming/pricing/removing an item or swapping its
+-- photo is now a database write the admin panel can do directly — no code
+-- deploy needed. Photos live in Supabase Storage (bucket "menu-images")
+-- since Vercel's public/ folder can't be written to at runtime.
+-- =========================================================
+create table if not exists public.menu_items (
+  id           bigserial primary key,
+  category     text not null,
+  name         text not null,
+  subtitle     text not null default '',
+  price        numeric(10, 2) not null check (price > 0),
+  image        text,
+  is_available boolean not null default true,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+-- One-time seed from the old lib/menu-data.ts array, folding in whatever
+-- was already set in menu_availability at migration time. Explicit ids so
+-- this stays idempotent (on conflict do nothing) across re-runs; the
+-- sequence is bumped past them right after so new admin-added items get
+-- fresh ids.
+insert into public.menu_items (id, category, name, subtitle, price, image, is_available) values
+  (1, 'Deals', 'Deal 01', '01 Zinger Burger + 01 Reg Drink + Fries', 450, '/deals/deal-1.png', true),
+  (2, 'Deals', 'Deal 02', '02 Zinger Burger + 02 Reg Drink + Fries', 890, '/deals/deal-2.png', true),
+  (3, 'Deals', 'Deal 03', '01 Zinger Burger + 01 Chicken Shawarma + 01 Half Ltr Drink + Fries', 640, '/deals/deal-3.png', true),
+  (4, 'Deals', 'Deal 04', '03 Zinger Burger + 01 Ltr Drink + Fries', 1200, '/deals/deal-4.png', true),
+  (5, 'Deals', 'Deal 05', '02 Zinger Roll Paratha + 02 Zinger Shawarma + 01 Ltr Drink', 1150, '/deals/deal-5.png', true),
+  (6, 'Deals', 'Deal 06', '02 Anda Shami Burger + 02 Chicken Shawarma + 01 Ltr Drink', 780, '/deals/deal-6.png', true),
+  (7, 'Burgers', 'Zinger Burger', 'زنگر برگر', 400, '/Burgers/zinger-burger.png', true),
+  (8, 'Burgers', 'Zinger Cheese Burger', 'زنگر چیز برگر', 450, '/Burgers/zinger-burger-cheeze.png', true),
+  (9, 'Burgers', 'Chicken Patty Burger', 'چکن پیٹی برگر', 280, '/Burgers/chicken-pattie-burger.png', true),
+  (10, 'Burgers', 'Chicken Patty Cheese Burger', 'چکن پیٹی چیز برگر', 330, '/Burgers/chicken-pattie-burger-cheeze.png', true),
+  (11, 'Burgers', 'Double Taker Burger', 'ڈبل ٹیکر برگر', 580, '/Burgers/chicken-takar-burger.png', true),
+  (12, 'Burgers', 'Chicken Lapeta Burger', 'چکن لپیٹا برگر', 350, '/Burgers/chicken-lapeta-burger.png', true),
+  (63, 'Burgers', 'Chicken Cheese Lapeta Burger', 'چکن چیز لپیٹا برگر', 400, '/Burgers/chicken-cheeze-lapeta-burger.png', true),
+  (13, 'Burgers', 'Shami Burger', 'شامی برگر', 140, '/Burgers/shami-burger.png', true),
+  (14, 'Burgers', 'Anda Shami Burger', 'انڈہ شامی برگر', 170, '/Burgers/anda-burger.png', true),
+  (15, 'Burgers', 'Double Anda Roll Burger', 'ڈبل انڈہ رول برگر', 230, '/Burgers/double-anda-roll-burger.png', true),
+  (16, 'Burgers', 'Shami Kebab', 'شامی کباب', 40, '/Burgers/shami-kabab.png', true),
+  (64, 'Burgers', 'Mayonnaise Small', 'میئونیز چھوٹا', 30, '/Burgers/mayonese-small.png', true),
+  (65, 'Burgers', 'Mayonnaise Big', 'میئونیز بڑا', 50, '/Burgers/mayonese-big.png', true),
+  (17, 'Fries', 'Loaded Fries', 'لوڈڈ فرائز', 350, '/Fries/loaded-fries.png', true),
+  (18, 'Fries', 'Nuggets', 'نگٹس', 350, '/Fries/nugets.png', true),
+  (29, 'Fries', 'Finger Chips', 'فنگر چپس', 150, '/Fries/fries.png', true),
+  (19, 'Shawarma & Rolls', 'Chicken Shawarma', 'چکن شوارما', 180, '/Shawarmas/chicken-shawarma.png', true),
+  (20, 'Shawarma & Rolls', 'Chicken Cheese Shawarma', 'چکن چیز شوارما', 230, '/Shawarmas/chicken-shawarma-cheeze.png', true),
+  (21, 'Shawarma & Rolls', 'Zinger Shawarma', 'زنگر شوارما', 250, '/Shawarmas/zinger-shawarma.png', true),
+  (62, 'Shawarma & Rolls', 'Platter Shawarma', 'پلیٹر شوارما', 320, '/Shawarmas/shawarma-platter.png', true),
+  (22, 'Shawarma & Rolls', 'Zinger Cheese Shawarma', 'زنگر چیز شوارما', 300, '/Shawarmas/zinger-shawarma-cheeze.png', true),
+  (23, 'Shawarma & Rolls', 'Chicken Roll Paratha', 'چکن رول پراٹھا', 250, '/Shawarmas/chicken-roll.png', true),
+  (24, 'Shawarma & Rolls', 'Chicken Cheese Roll Paratha', 'چکن چیز رول پراٹھا', 300, '/Shawarmas/chicken-roll-cheeze.png', true),
+  (25, 'Shawarma & Rolls', 'Zinger Roll Paratha', 'زنگر رول پراٹھا', 300, '/Shawarmas/zinger-roll.png', true),
+  (26, 'Shawarma & Rolls', 'Zinger Cheese Roll Paratha', 'زنگر چیز رول پراٹھا', 350, '/Shawarmas/zinger-roll-cheeze.png', true),
+  (66, 'Shawarma & Rolls', 'Mayonnaise Small', 'میئونیز چھوٹا', 30, '/Burgers/mayonese-small.png', true),
+  (67, 'Shawarma & Rolls', 'Mayonnaise Big', 'میئونیز بڑا', 50, '/Burgers/mayonese-big.png', true),
+  (27, 'Chicken', 'Wings (6 Pcs)', 'ونگز 6 پیس', 350, '/chicken/wings.png', true),
+  (36, 'Chicken', 'Chicken Pieces Small', 'چکن پیس چھوٹا', 180, '/chicken/chicken-small.png', true),
+  (37, 'Chicken', 'Chicken Pieces Big', 'چکن پیس بڑا', 280, '/chicken/chicken-big.png', true),
+  (30, 'Chaat & Bhalle', 'Dahi Bhalle', 'دہی بھلے', 220, '/chats/dahi-bhala.png', true),
+  (31, 'Chaat & Bhalle', 'Chana Chaat', 'چنا چاٹ', 220, '/chats/channa-chat.png', true),
+  (32, 'Chaat & Bhalle', 'Papri Chaat', 'پاپڑی چاٹ', 220, '/chats/papri-chat.png', true),
+  (33, 'Chaat & Bhalle', 'Cream Fruit Chaat', 'کریم فروٹ چاٹ', 250, '/chats/fruit-chat.png', true),
+  (34, 'Chaat & Bhalle', 'Khatte Meethe Gol Gappe Half', 'کھٹے میٹھے گول گپے ہاف', 150, '/chats/gol-gappy-half.png', true),
+  (35, 'Chaat & Bhalle', 'Khatte Meethe Gol Gappe Full', 'کھٹے میٹھے گول گپے فل', 250, '/chats/gol-gappy-full.png', true),
+  (48, 'Ice Cream', 'Ice Cream Large', 'آئس کریم لارج', 270, '/Ice-Creams/Ice-cream-large.png', true),
+  (49, 'Ice Cream', 'Ice Cream Small', 'آئس کریم سمال', 180, '/Ice-Creams/Ice-cream-small.png', true),
+  (50, 'Ice Cream', 'Kulfa Falooda', 'قلفہ فالودہ', 300, '/Ice-Creams/khulfa-falooda.png', false),
+  (38, 'Juices & Shakes', 'Apple Banana Milkshake', 'سیب کیلا ملک شیک', 220, '/Juices/apple-banana-milk-shake.png', true),
+  (39, 'Juices & Shakes', 'Chiku Milkshake', 'چیکو ملک شیک', 220, '/Juices/chicu-shake.png', false),
+  (40, 'Juices & Shakes', 'Khajoor Banana Milkshake', 'کھجور کیلا ملک شیک', 250, '/Juices/date-banana-milk-shake.png', true),
+  (41, 'Juices & Shakes', 'Khajoor Badam Milkshake', 'کھجور بادام ملک شیک', 300, '/Juices/date-almond-shake.png', true),
+  (42, 'Juices & Shakes', 'Mint Margarita', 'منٹ مارگریٹا', 200, '/Juices/mint-margaretta.png', true),
+  (43, 'Juices & Shakes', 'Chocolate Shake', 'چاکلیٹ شیک', 300, '/Juices/choclate-shake.png', true),
+  (44, 'Juices & Shakes', 'Strawberry Milkshake', 'اسٹرابیری ملک شیک', 300, '/Juices/straw-berry-shake.png', false),
+  (45, 'Juices & Shakes', 'Falsa Juice', 'فالسہ جوس', 220, '/Juices/falsa-juice.png', true),
+  (46, 'Juices & Shakes', 'Pineapple Milkshake', 'پائن ایپل ملک شیک', 300, '/Juices/pine-apple-shake.png', true),
+  (47, 'Juices & Shakes', 'Ice Cream Milkshake', 'آئس کریم ملک شیک', 350, '/Juices/ice-cream-shake.png', true),
+  (73, 'Juices & Shakes', 'Mango Milkshake', 'آم ملک شیک', 220, '/Juices/mango-shake.png', true),
+  (51, 'Juices & Shakes', 'Almond Milkshake', 'آلو ملک شیک', 250, '/Juices/almond-shake.png', false),
+  (52, 'Juices & Shakes', 'Anar Juice', 'انار جوس', 300, '/Juices/anar-juice.png', false),
+  (53, 'Juices & Shakes', 'Apple Juice', 'سیب جوس', 300, '/Juices/apple-juice.png', false),
+  (54, 'Juices & Shakes', 'Carrot Juice', 'گاجر جوس', 160, '/Juices/carrot-juice.png', false),
+  (55, 'Juices & Shakes', 'Grape Fruit Juice', 'گریپ فروٹ جوس', 220, '/Juices/grapes-juice.png', false),
+  (56, 'Juices & Shakes', 'Oreo Chocolate Shake', 'Oreo چاکلیٹ شیک', 300, '/Juices/oreo-choclate-shake.png', true),
+  (57, 'Juices & Shakes', 'Pineapple Juice', 'پائن ایپل کا جوس', 300, '/Juices/pine-apple-juice.png', true),
+  (58, 'Juices & Shakes', 'Malta Juice', 'مالٹا جوس', 180, '/Juices/orange-juice.png', false),
+  (59, 'Cold Drinks', 'Cola Next (Regular)', 'کولا نیکسٹ ریگولر', 80, '/drinks/cola-regular.png', true),
+  (60, 'Cold Drinks', 'Cola Next (1 Ltr)', 'کولا نیکسٹ 1 لیٹر', 160, '/drinks/cola-1.png', true),
+  (61, 'Cold Drinks', 'Cola Next (1.5 Ltr)', 'کولا نیکسٹ 1.5 لیٹر', 200, '/drinks/cola-1.5.png', true),
+  (68, 'Cold Drinks', 'Fizzup (Regular)', 'فزاپ ریگولر', 80, '/drinks/fizzup-regular.png', true),
+  (69, 'Cold Drinks', 'Fizzup (1 Ltr)', 'فزاپ 1 لیٹر', 160, '/drinks/fizzup-1.png', true),
+  (70, 'Cold Drinks', 'Fizzup (1.5 Ltr)', 'فزاپ 1.5 لیٹر', 200, '/drinks/fizzup-1.5.png', true),
+  (71, 'Cold Drinks', 'Water Bottle (Small)', 'واٹر بوتل چھوٹی', 60, '/drinks/water-small.png', true),
+  (72, 'Cold Drinks', 'Water Bottle (Big)', 'واٹر بوتل بڑی', 120, '/drinks/water-large.png', true)
+on conflict (id) do nothing;
+
+select setval('public.menu_items_id_seq', (select greatest(max(id), 1) from public.menu_items));
+
+-- Storage bucket for admin-uploaded item photos (public read, so <img src>
+-- can hit the CDN URL directly with no auth). Writes only ever happen
+-- through the service-role admin client, which bypasses storage RLS
+-- entirely, so no insert/update/delete policy is needed here.
+insert into storage.buckets (id, name, public)
+values ('menu-images', 'menu-images', true)
+on conflict (id) do nothing;
+
+drop policy if exists "menu images are publicly readable" on storage.objects;
+create policy "menu images are publicly readable"
+  on storage.objects
+  for select
+  to anon, authenticated
+  using (bucket_id = 'menu-images');
 
 -- Note: there is no "admins" table — the admin panel uses a single
 -- username/password pair from environment variables (ADMIN_USERNAME,
@@ -146,6 +255,11 @@ create trigger trg_menu_availability_updated_at
   before update on public.menu_availability
   for each row execute function public.set_updated_at();
 
+drop trigger if exists trg_menu_items_updated_at on public.menu_items;
+create trigger trg_menu_items_updated_at
+  before update on public.menu_items
+  for each row execute function public.set_updated_at();
+
 drop trigger if exists trg_site_settings_updated_at on public.site_settings;
 create trigger trg_site_settings_updated_at
   before update on public.site_settings
@@ -159,17 +273,25 @@ create trigger trg_site_settings_updated_at
 -- RLS entirely). This keeps customer data and the ban list unreadable from
 -- the browser under all circumstances.
 --
--- menu_availability and site_settings are the exceptions: neither is
--- sensitive (an in-stock flag and a single delivery on/off switch), and the
--- public site needs to read both directly, so they get public SELECT
--- policies.
+-- menu_availability, menu_items, and site_settings are the exceptions: none
+-- of them is sensitive (an in-stock flag, the menu itself, and a single
+-- delivery on/off switch), and the public site needs to read them directly,
+-- so they get public SELECT policies.
 -- =========================================================
 alter table public.customers enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
 alter table public.riders enable row level security;
 alter table public.menu_availability enable row level security;
+alter table public.menu_items enable row level security;
 alter table public.site_settings enable row level security;
+
+drop policy if exists "menu items are publicly readable" on public.menu_items;
+create policy "menu items are publicly readable"
+  on public.menu_items
+  for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "menu availability is publicly readable" on public.menu_availability;
 create policy "menu availability is publicly readable"
@@ -191,10 +313,9 @@ create policy "site settings are publicly readable"
 -- inserts the order + line items atomically.
 --
 -- p_items shape: [{"id": 7, "name": "Zinger Burger", "category": "Burgers", "unit_price": 400, "quantity": 2}, ...]
--- "id" matches MenuItem.id from lib/menu-data.ts and is checked against
--- menu_availability — a sold-out item can't be ordered even if the
--- customer's page was open before it was toggled off, and a price_override
--- there always overrides the client-sent unit_price.
+-- "id" matches menu_items.id and is checked there — a sold-out item can't
+-- be ordered even if the customer's page was open before it was toggled
+-- off, and menu_items.price always overrides the client-sent unit_price.
 -- p_latitude/p_longitude are optional (from the browser's geolocation, if the
 -- customer grants permission) — delivery_address is always the primary
 -- human-entered location.
@@ -243,8 +364,8 @@ begin
   select string_agg(item->>'name', ', ')
   into v_sold_out_names
   from jsonb_array_elements(p_items) as item
-  join public.menu_availability ma on ma.item_id = (item->>'id')::integer
-  where ma.is_available = false;
+  join public.menu_items mi on mi.id = (item->>'id')::bigint
+  where mi.is_available = false;
 
   if v_sold_out_names is not null then
     raise exception 'Sorry, these items just sold out: %', v_sold_out_names;
@@ -260,13 +381,13 @@ begin
     raise exception 'This phone number is banned from placing orders.';
   end if;
 
-  -- price_override always wins over whatever price the client sent, so a
+  -- menu_items.price always wins over whatever price the client sent, so a
   -- stale page can't under-charge (or over-charge) against the admin's
   -- current rate.
-  select sum(coalesce(ma.price_override, (item->>'unit_price')::numeric) * (item->>'quantity')::integer)
+  select sum(coalesce(mi.price, (item->>'unit_price')::numeric) * (item->>'quantity')::integer)
   into v_subtotal
   from jsonb_array_elements(p_items) as item
-  left join public.menu_availability ma on ma.item_id = (item->>'id')::integer;
+  left join public.menu_items mi on mi.id = (item->>'id')::bigint;
 
   -- Delivery charge isn't collected from the customer at order time — it's
   -- confirmed over WhatsApp and set by the admin per order afterwards.
@@ -282,10 +403,10 @@ begin
     v_order_id,
     item->>'name',
     item->>'category',
-    coalesce(ma.price_override, (item->>'unit_price')::numeric),
+    coalesce(mi.price, (item->>'unit_price')::numeric),
     (item->>'quantity')::integer
   from jsonb_array_elements(p_items) as item
-  left join public.menu_availability ma on ma.item_id = (item->>'id')::integer;
+  left join public.menu_items mi on mi.id = (item->>'id')::bigint;
 
   return v_order_id;
 end;
