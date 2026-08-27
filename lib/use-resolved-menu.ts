@@ -16,11 +16,25 @@ type MenuItemRow = {
   is_available: boolean
 }
 
-// The menu itself now lives in the menu_items table (admin-managed — see
-// /admin/menu), not in code, so this fetches it fresh on every mount rather
-// than falling back to any bundled default.
-export function useResolvedMenu(): ResolvedMenuItem[] {
-  const [resolved, setResolved] = useState<ResolvedMenuItem[]>([])
+function toResolved(row: MenuItemRow): ResolvedMenuItem {
+  return {
+    id: row.id,
+    category: row.category,
+    name: row.name,
+    subtitle: row.subtitle,
+    price: row.price,
+    image: row.image,
+    available: row.is_available,
+  }
+}
+
+// The menu itself lives in the menu_items table (admin-managed — see
+// /admin/menu), not in code. `initial` is the server-fetched snapshot used
+// for the first paint (so the page isn't blank while this client fetch is
+// in flight); this still re-fetches once on mount to pick up any admin
+// change made after that snapshot was taken.
+export function useResolvedMenu(initial: ResolvedMenuItem[] = []): ResolvedMenuItem[] {
+  const [resolved, setResolved] = useState<ResolvedMenuItem[]>(initial)
 
   useEffect(() => {
     let cancelled = false
@@ -33,17 +47,7 @@ export function useResolvedMenu(): ResolvedMenuItem[] {
       .returns<MenuItemRow[]>()
       .then(({ data }) => {
         if (cancelled || !data) return
-        setResolved(
-          data.map((row) => ({
-            id: row.id,
-            category: row.category,
-            name: row.name,
-            subtitle: row.subtitle,
-            price: row.price,
-            image: row.image,
-            available: row.is_available,
-          }))
-        )
+        setResolved(data.map(toResolved))
       })
 
     return () => {
