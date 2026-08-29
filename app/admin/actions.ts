@@ -123,10 +123,16 @@ export async function addMenuItem(formData: FormData) {
   let image: string | null = null
   const file = formData.get('image')
   if (file instanceof File && file.size > 0) {
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const path = `${randomUUID()}.${ext}`
-    const { error: uploadError } = await admin.storage.from('menu-images').upload(path, file, {
-      contentType: file.type || 'image/jpeg',
+    // Phone camera photos land here at several MB each — re-encode to a
+    // compressed WebP before storing so the public site never has to serve
+    // multi-megabyte images per dish (see the one-time migration that fixed
+    // this for the original menu photos).
+    const sharp = (await import('sharp')).default
+    const original = Buffer.from(await file.arrayBuffer())
+    const optimized = await sharp(original).webp({ quality: 82 }).toBuffer()
+    const path = `${randomUUID()}.webp`
+    const { error: uploadError } = await admin.storage.from('menu-images').upload(path, optimized, {
+      contentType: 'image/webp',
     })
     if (!uploadError) {
       image = admin.storage.from('menu-images').getPublicUrl(path).data.publicUrl

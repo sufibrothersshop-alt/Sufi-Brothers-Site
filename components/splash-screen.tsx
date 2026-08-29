@@ -12,15 +12,28 @@ export function SplashScreen() {
   const [fading, setFading] = useState(false)
 
   useEffect(() => {
-    if (sessionStorage.getItem(SPLASH_SESSION_KEY)) {
-      setVisible(false)
-      return
+    // Some mobile browsers (Safari private tabs, WhatsApp/Instagram in-app
+    // browsers) block or throw on storage access. An uncaught throw here
+    // would skip every line below — including the timers that hide the
+    // splash — and leave it stuck on screen forever, so every check in this
+    // effect must fail safe rather than crash it.
+    try {
+      if (sessionStorage.getItem(SPLASH_SESSION_KEY)) {
+        setVisible(false)
+        return
+      }
+      sessionStorage.setItem(SPLASH_SESSION_KEY, '1')
+    } catch {
+      // Can't remember we've shown it — fine, just proceed and show it once.
     }
-    sessionStorage.setItem(SPLASH_SESSION_KEY, '1')
 
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setVisible(false)
-      return
+    try {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        setVisible(false)
+        return
+      }
+    } catch {
+      // Ignore — worst case the splash plays its normal animation.
     }
 
     const start = Date.now()
