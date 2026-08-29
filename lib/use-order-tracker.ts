@@ -14,8 +14,8 @@ const POLL_MS = 15000
 
 export const ORDER_PHASES = [
   { key: 'processing', label: 'Processing your order', minutes: 5 },
-  { key: 'cooking', label: 'Cooking', minutes: 20 },
-  { key: 'delivery', label: 'Out for delivery', minutes: 20 },
+  { key: 'cooking', label: 'Cooking', minutes: 15 },
+  { key: 'delivery', label: 'Out for delivery', minutes: 15 },
 ] as const
 
 export const TOTAL_ORDER_MINUTES = ORDER_PHASES.reduce((sum, phase) => sum + phase.minutes, 0)
@@ -28,8 +28,8 @@ const PHASE_UPPER_BOUNDS = (() => {
     bounds.push(acc)
   }
   return bounds
-})() // [5, 25, 45]
-const PHASE_LOWER_BOUNDS = [0, ...PHASE_UPPER_BOUNDS.slice(0, -1)] // [0, 5, 25]
+})() // [5, 20, 35]
+const PHASE_LOWER_BOUNDS = [0, ...PHASE_UPPER_BOUNDS.slice(0, -1)] // [0, 5, 20]
 
 // How long past "delivered" a stale tracker is still allowed to show before
 // we stop restoring it on page load (covers a browser left open overnight).
