@@ -5,27 +5,56 @@ import { StatTile } from '@/components/admin/stat-tile'
 import { AutoPrintNewOrders } from '@/components/admin/auto-print-new-orders'
 
 const RECENT_ORDERS_LIMIT = 50
+const PAGE_SIZE = 1000 // Supabase's API never returns more rows than this per request
+
+// A plain `select('status, total_amount')` silently stops at PAGE_SIZE rows, so
+// summing it froze "Total orders" at 1000 and undercounted pending + revenue.
+// Counts come from the database exactly; revenue is summed page by page (all
+// pages fetched in parallel once the count is known). If any page fails,
+// revenue is null (shown as "—") rather than a quietly-wrong total.
+async function getOrderStats(admin: ReturnType<typeof createAdminClient>) {
+  const [{ count: total }, { count: pending }, { count: billable }] = await Promise.all([
+    admin.from('orders').select('*', { count: 'exact', head: true }),
+    admin.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    admin.from('orders').select('*', { count: 'exact', head: true }).neq('status', 'cancelled'),
+  ])
+
+  const pages = await Promise.all(
+    Array.from({ length: Math.ceil((billable ?? 0) / PAGE_SIZE) }, (_, i) =>
+      admin
+        .from('orders')
+        .select('total_amount')
+        .neq('status', 'cancelled')
+        .order('created_at')
+        .order('id') // tiebreaker so pages never overlap or skip rows
+        .range(i * PAGE_SIZE, (i + 1) * PAGE_SIZE - 1)
+        .returns<{ total_amount: number }[]>()
+    )
+  )
+
+  const failed = pages.some(({ error }) => error)
+  const revenue = failed ? null : pages.reduce((sum, { data }) => sum + (data ?? []).reduce((s, o) => s + o.total_amount, 0), 0)
+
+  return { totalOrders: total ?? 0, pendingOrders: pending ?? 0, revenue }
+}
 
 export default async function AdminOrdersPage() {
   const admin = createAdminClient()
 
-  const [{ data: recentOrders }, { data: orderTotals }, { count: bannedCount }, { data: riders }, { data: settings }] = await Promise.all([
+  const [{ data: recentOrders }, { totalOrders, pendingOrders, revenue }, { count: bannedCount }, { data: riders }, { data: settings }] = await Promise.all([
     admin
       .from('orders')
       .select('*, order_items(*), rider:riders(id, name, phone)')
       .order('created_at', { ascending: false })
       .limit(RECENT_ORDERS_LIMIT)
       .returns<OrderRow[]>(),
-    admin.from('orders').select('status, total_amount').returns<{ status: string; total_amount: number }[]>(),
+    getOrderStats(admin),
     admin.from('customers').select('*', { count: 'exact', head: true }).eq('is_banned', true),
     admin.from('riders').select('id, name, phone').eq('is_active', true).order('name').returns<RiderInfo[]>(),
     admin.from('site_settings').select('delivery_enabled').eq('id', 1).maybeSingle<{ delivery_enabled: boolean }>(),
   ])
 
   const deliveryEnabled = settings?.delivery_enabled ?? true
-  const totalOrders = orderTotals?.length ?? 0
-  const pendingOrders = (orderTotals ?? []).filter((o) => o.status === 'pending').length
-  const revenue = (orderTotals ?? []).filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0)
   const pendingOrdersForAlerts = (recentOrders ?? [])
     .filter((o) => o.status === 'pending')
     .map((o) => ({ id: o.id, deliveryFee: o.delivery_fee }))
@@ -54,7 +83,7 @@ export default async function AdminOrdersPage() {
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile label="Total orders" value={String(totalOrders)} tone="gold" />
         <StatTile label="Pending orders" value={String(pendingOrders)} tone="red" />
-        <StatTile label="Revenue" value={`Rs. ${revenue}`} tone="gold" />
+        <StatTile label="Revenue" value={revenue === null ? '—' : `Rs. ${revenue}`} tone="gold" />
         <StatTile label="Banned customers" value={String(bannedCount ?? 0)} tone="plain" />
       </section>
 
