@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Script from 'next/script'
 import {
   ArrowRight,
   Bike,
@@ -66,6 +67,10 @@ export function HomePage({ initialMenuItems }: { initialMenuItems: ResolvedMenuI
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
       <SplashScreen />
+      {/* Chat widget (Zanderio). Loaded at idle time so its ~590KB script never
+          competes with the menu. Which side the button sits on is a setting in
+          the widget's own dashboard — it isn't controllable from this tag. */}
+      <Script src="https://cdn.zanderio.ai/widget/loader.js" data-id="wdg_9YSBz5pFGEhuoyFCBpvcYhzm" strategy="lazyOnload" />
       <MenuImagePrefetcher images={menuItems.map((item) => item.image)} />
       {!deliveryEnabled && <DeliveryOffBanner />}
       <div className="bg-primary px-4 py-2 text-center text-xs font-semibold tracking-wide text-primary-foreground sm:text-sm">
