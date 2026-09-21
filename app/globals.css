@@ -161,3 +161,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Last-resort exit for the splash overlay (see components/splash-screen.tsx).
+   The overlay is in the server-rendered HTML and normally removed by JS; if
+   the script bundle is slow or fails on a weak mobile connection, this hides
+   it anyway so people never get stuck on it. Runs later than the JS timers. */
+@keyframes splash-failsafe {
+  to {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+.splash-failsafe {
+  animation: splash-failsafe 0.3s ease 5s forwards;
+}

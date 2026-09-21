@@ -99,6 +99,7 @@ export async function setItemAvailability(itemId: number, isAvailable: boolean) 
   const admin = createAdminClient()
   await admin.from('menu_items').update({ is_available: isAvailable }).eq('id', itemId)
   revalidatePath('/admin/menu')
+  revalidatePath('/') // public homepage is cached (ISR) — refresh it too
 }
 
 export async function updateItemPrice(itemId: number, formData: FormData) {
@@ -108,6 +109,7 @@ export async function updateItemPrice(itemId: number, formData: FormData) {
   const admin = createAdminClient()
   await admin.from('menu_items').update({ price }).eq('id', itemId)
   revalidatePath('/admin/menu')
+  revalidatePath('/') // public homepage is cached (ISR) — refresh it too
 }
 
 export async function addMenuItem(formData: FormData) {
@@ -141,6 +143,7 @@ export async function addMenuItem(formData: FormData) {
 
   await admin.from('menu_items').insert({ category, name, subtitle, price, image })
   revalidatePath('/admin/menu')
+  revalidatePath('/') // public homepage is cached (ISR) — refresh it too
 }
 
 export async function deleteMenuItem(itemId: number) {
@@ -148,6 +151,7 @@ export async function deleteMenuItem(itemId: number) {
   const admin = createAdminClient()
   await admin.from('menu_items').delete().eq('id', itemId)
   revalidatePath('/admin/menu')
+  revalidatePath('/') // public homepage is cached (ISR) — refresh it too
 }
 
 export async function addRider(formData: FormData) {

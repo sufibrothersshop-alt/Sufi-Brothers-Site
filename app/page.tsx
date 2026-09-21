@@ -12,21 +12,27 @@ type MenuItemRow = {
   is_available: boolean
 }
 
-// Menu items are fetched server-side so the menu is already in the HTML on
-// first paint (instead of the page rendering empty until the client fetches
-// menu_items after hydration). Forced dynamic so an admin's add/price/sold-
-// out change is visible on the very next request, not stuck behind a stale
-// prerendered shell.
-export const dynamic = 'force-dynamic'
+// The menu is fetched server-side so it's already in the HTML on first paint,
+// and the page is cached (ISR) so visitors get it from the CDN edge instead
+// of waiting on a per-request render + Supabase round trip (force-dynamic
+// made every open cost ~1-2s on mobile). Admin menu actions call
+// revalidatePath('/') so edits show up immediately; the 5-minute revalidate
+// is only a backstop, and the client re-fetches live availability/prices on
+// mount regardless.
+export const revalidate = 300
 
 export default async function Page() {
   const admin = createAdminClient()
 
-  const { data } = await admin
+  const { data, error } = await admin
     .from('menu_items')
     .select('id, category, name, subtitle, price, image, is_available')
     .order('id')
     .returns<MenuItemRow[]>()
+
+  // Throw rather than render an empty menu: a failed render keeps serving the
+  // last good cached page, whereas an empty one would get cached itself.
+  if (error) throw new Error(`Failed to load menu: ${error.message}`)
 
   const initialMenuItems: ResolvedMenuItem[] = (data ?? []).map((row) => ({
     id: row.id,

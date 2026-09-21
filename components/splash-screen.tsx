@@ -75,7 +75,7 @@ export function SplashScreen() {
   return (
     <div
       aria-hidden="true"
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-primary transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}
+      className={`splash-failsafe fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-primary transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}
     >
       <svg
         width="72"
