@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { MenuItem } from '@/lib/menu-data'
 import { createClient } from '@/lib/supabase/client'
+import type { Branch } from '@/lib/branches'
 
 export type ResolvedMenuItem = MenuItem & { available: boolean }
 
@@ -33,7 +34,7 @@ function toResolved(row: MenuItemRow): ResolvedMenuItem {
 // for the first paint (so the page isn't blank while this client fetch is
 // in flight); this still re-fetches once on mount to pick up any admin
 // change made after that snapshot was taken.
-export function useResolvedMenu(initial: ResolvedMenuItem[] = []): ResolvedMenuItem[] {
+export function useResolvedMenu(branch: Branch, initial: ResolvedMenuItem[] = []): ResolvedMenuItem[] {
   const [resolved, setResolved] = useState<ResolvedMenuItem[]>(initial)
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export function useResolvedMenu(initial: ResolvedMenuItem[] = []): ResolvedMenuI
     supabase
       .from('menu_items')
       .select('id, category, name, subtitle, price, image, is_available')
+      .eq('branch', branch)
       .order('id')
       .returns<MenuItemRow[]>()
       .then(({ data }) => {
@@ -53,7 +55,7 @@ export function useResolvedMenu(initial: ResolvedMenuItem[] = []): ResolvedMenuI
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [branch])
 
   return resolved
 }

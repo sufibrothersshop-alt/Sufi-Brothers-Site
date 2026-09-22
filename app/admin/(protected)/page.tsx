@@ -1,3 +1,4 @@
+import { requireAdmin, type Branch } from '@/lib/admin-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { setDeliveryEnabled } from '@/app/admin/actions'
 import { OrderCard, type OrderRow, type RiderInfo } from '@/components/admin/order-card'
@@ -14,11 +15,11 @@ const STALE_PENDING_HOURS = 24
 // Counts come from the database exactly; revenue is summed page by page (all
 // pages fetched in parallel once the count is known). If any page fails,
 // revenue is null (shown as "—") rather than a quietly-wrong total.
-async function getOrderStats(admin: ReturnType<typeof createAdminClient>) {
+async function getOrderStats(admin: ReturnType<typeof createAdminClient>, branch: Branch) {
   const [{ count: total }, { count: pending }, { count: billable }] = await Promise.all([
-    admin.from('orders').select('*', { count: 'exact', head: true }),
-    admin.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    admin.from('orders').select('*', { count: 'exact', head: true }).neq('status', 'cancelled'),
+    admin.from('orders').select('*', { count: 'exact', head: true }).eq('branch', branch),
+    admin.from('orders').select('*', { count: 'exact', head: true }).eq('branch', branch).eq('status', 'pending'),
+    admin.from('orders').select('*', { count: 'exact', head: true }).eq('branch', branch).neq('status', 'cancelled'),
   ])
 
   const pages = await Promise.all(
@@ -26,6 +27,7 @@ async function getOrderStats(admin: ReturnType<typeof createAdminClient>) {
       admin
         .from('orders')
         .select('total_amount')
+        .eq('branch', branch)
         .neq('status', 'cancelled')
         .order('created_at')
         .order('id') // tiebreaker so pages never overlap or skip rows
@@ -41,6 +43,7 @@ async function getOrderStats(admin: ReturnType<typeof createAdminClient>) {
 }
 
 export default async function AdminOrdersPage() {
+  const branch = await requireAdmin()
   const admin = createAdminClient()
 
   const staleCutoff = new Date(Date.now() - STALE_PENDING_HOURS * 60 * 60 * 1000).toISOString()
@@ -49,14 +52,15 @@ export default async function AdminOrdersPage() {
     admin
       .from('orders')
       .select('*, order_items(*), rider:riders(id, name, phone)')
+      .eq('branch', branch)
       .order('created_at', { ascending: false })
       .limit(RECENT_ORDERS_LIMIT)
       .returns<OrderRow[]>(),
-    getOrderStats(admin),
-    admin.from('customers').select('*', { count: 'exact', head: true }).eq('is_banned', true),
-    admin.from('riders').select('id, name, phone').eq('is_active', true).order('name').returns<RiderInfo[]>(),
-    admin.from('site_settings').select('delivery_enabled').eq('id', 1).maybeSingle<{ delivery_enabled: boolean }>(),
-    admin.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending').lt('created_at', staleCutoff),
+    getOrderStats(admin, branch),
+    admin.from('customers').select('*', { count: 'exact', head: true }).eq('branch', branch).eq('is_banned', true),
+    admin.from('riders').select('id, name, phone').eq('branch', branch).eq('is_active', true).order('name').returns<RiderInfo[]>(),
+    admin.from('site_settings').select('delivery_enabled').eq('branch', branch).maybeSingle<{ delivery_enabled: boolean }>(),
+    admin.from('orders').select('*', { count: 'exact', head: true }).eq('branch', branch).eq('status', 'pending').lt('created_at', staleCutoff),
   ])
 
   const deliveryEnabled = settings?.delivery_enabled ?? true

@@ -5,18 +5,21 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { ADMIN_COOKIE_MAX_AGE, ADMIN_COOKIE_NAME, createSessionToken, requireAdmin, verifyCredentials } from '@/lib/admin-auth'
+import { ADMIN_COOKIE_MAX_AGE, ADMIN_COOKIE_NAME, createSessionCookieValue, requireAdmin, verifyCredentials } from '@/lib/admin-auth'
 
 export async function signIn(formData: FormData) {
   const username = String(formData.get('username') ?? '')
   const password = String(formData.get('password') ?? '')
 
-  if (!verifyCredentials(username, password)) {
+  // Which branch you land in is decided entirely by which branch's
+  // username/password matched — there's no separate branch selector here.
+  const branch = verifyCredentials(username, password)
+  if (!branch) {
     redirect('/admin/login?error=invalid_credentials')
   }
 
   const cookieStore = await cookies()
-  cookieStore.set(ADMIN_COOKIE_NAME, createSessionToken(), {
+  cookieStore.set(ADMIN_COOKIE_NAME, createSessionCookieValue(branch), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -34,24 +37,26 @@ export async function signOut() {
 }
 
 export async function banCustomer(phone: string, formData: FormData) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const reason = String(formData.get('reason') ?? '').trim()
   const admin = createAdminClient()
   await admin
     .from('customers')
     .update({ is_banned: true, ban_reason: reason || null, banned_at: new Date().toISOString() })
     .eq('phone', phone)
+    .eq('branch', branch)
   revalidatePath('/admin/customers')
   revalidatePath(`/admin/customers/${encodeURIComponent(phone)}`)
 }
 
 export async function unbanCustomer(phone: string) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const admin = createAdminClient()
   await admin
     .from('customers')
     .update({ is_banned: false, ban_reason: null, banned_at: null })
     .eq('phone', phone)
+    .eq('branch', branch)
   revalidatePath('/admin/customers')
   revalidatePath(`/admin/customers/${encodeURIComponent(phone)}`)
 }
@@ -60,60 +65,67 @@ const ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'out_for_delivery',
 const STATUSES_REQUIRING_FEE = new Set(['confirmed', 'preparing', 'out_for_delivery', 'delivered'])
 
 export async function updateOrderStatus(orderId: string, formData: FormData) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const status = String(formData.get('status') ?? '')
   if (!ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number])) return
   const admin = createAdminClient()
   if (STATUSES_REQUIRING_FEE.has(status)) {
-    const { data: order } = await admin.from('orders').select('delivery_fee').eq('id', orderId).single()
+    const { data: order } = await admin.from('orders').select('delivery_fee').eq('id', orderId).eq('branch', branch).single()
     if (!order || Number(order.delivery_fee) <= 0) return
   }
-  await admin.from('orders').update({ status }).eq('id', orderId)
+  await admin.from('orders').update({ status }).eq('id', orderId).eq('branch', branch)
   revalidatePath('/admin')
   revalidatePath('/admin/customers/[phone]', 'page')
 }
 
 export async function updateDeliveryFee(orderId: string, formData: FormData) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const fee = Number(formData.get('delivery_fee'))
   if (!Number.isFinite(fee) || fee < 0) return
   const admin = createAdminClient()
   const { data: items } = await admin.from('order_items').select('line_total').eq('order_id', orderId)
   const subtotal = (items ?? []).reduce((sum, item) => sum + Number(item.line_total), 0)
-  await admin.from('orders').update({ delivery_fee: fee, total_amount: subtotal + fee }).eq('id', orderId)
+  await admin.from('orders').update({ delivery_fee: fee, total_amount: subtotal + fee }).eq('id', orderId).eq('branch', branch)
   revalidatePath('/admin')
   revalidatePath('/admin/customers/[phone]', 'page')
 }
 
 export async function assignRider(orderId: string, formData: FormData) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const riderId = String(formData.get('rider_id') ?? '').trim()
   const admin = createAdminClient()
-  await admin.from('orders').update({ rider_id: riderId || null }).eq('id', orderId)
+  // Confirms the rider is actually this branch's before assigning — the
+  // dropdown only ever lists this branch's riders, but this stops a forged
+  // rider_id from attaching another branch's rider to this branch's order.
+  if (riderId) {
+    const { data: rider } = await admin.from('riders').select('id').eq('id', riderId).eq('branch', branch).maybeSingle()
+    if (!rider) return
+  }
+  await admin.from('orders').update({ rider_id: riderId || null }).eq('id', orderId).eq('branch', branch)
   revalidatePath('/admin')
   revalidatePath('/admin/customers/[phone]', 'page')
 }
 
 export async function setItemAvailability(itemId: number, isAvailable: boolean) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const admin = createAdminClient()
-  await admin.from('menu_items').update({ is_available: isAvailable }).eq('id', itemId)
+  await admin.from('menu_items').update({ is_available: isAvailable }).eq('id', itemId).eq('branch', branch)
   revalidatePath('/admin/menu')
-  revalidatePath('/') // public homepage is cached (ISR) — refresh it too
+  revalidatePath(`/${branch}`) // that branch's public menu is cached (ISR) — refresh it too
 }
 
 export async function updateItemPrice(itemId: number, formData: FormData) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const price = Number(formData.get('price'))
   if (!Number.isFinite(price) || price <= 0) return
   const admin = createAdminClient()
-  await admin.from('menu_items').update({ price }).eq('id', itemId)
+  await admin.from('menu_items').update({ price }).eq('id', itemId).eq('branch', branch)
   revalidatePath('/admin/menu')
-  revalidatePath('/') // public homepage is cached (ISR) — refresh it too
+  revalidatePath(`/${branch}`)
 }
 
 export async function addMenuItem(formData: FormData) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const category = String(formData.get('category') ?? '').trim()
   const name = String(formData.get('name') ?? '').trim()
   const subtitle = String(formData.get('subtitle') ?? '').trim()
@@ -141,42 +153,42 @@ export async function addMenuItem(formData: FormData) {
     }
   }
 
-  await admin.from('menu_items').insert({ category, name, subtitle, price, image })
+  await admin.from('menu_items').insert({ category, name, subtitle, price, image, branch })
   revalidatePath('/admin/menu')
-  revalidatePath('/') // public homepage is cached (ISR) — refresh it too
+  revalidatePath(`/${branch}`)
 }
 
 export async function deleteMenuItem(itemId: number) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const admin = createAdminClient()
-  await admin.from('menu_items').delete().eq('id', itemId)
+  await admin.from('menu_items').delete().eq('id', itemId).eq('branch', branch)
   revalidatePath('/admin/menu')
-  revalidatePath('/') // public homepage is cached (ISR) — refresh it too
+  revalidatePath(`/${branch}`)
 }
 
 export async function addRider(formData: FormData) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const name = String(formData.get('name') ?? '').trim()
   const phone = String(formData.get('phone') ?? '').trim()
   if (!name || !phone) return
   const admin = createAdminClient()
-  await admin.from('riders').insert({ name, phone })
+  await admin.from('riders').insert({ name, phone, branch })
   revalidatePath('/admin/riders')
   revalidatePath('/admin')
 }
 
 export async function setRiderActive(riderId: string, isActive: boolean) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const admin = createAdminClient()
-  await admin.from('riders').update({ is_active: isActive }).eq('id', riderId)
+  await admin.from('riders').update({ is_active: isActive }).eq('id', riderId).eq('branch', branch)
   revalidatePath('/admin/riders')
   revalidatePath('/admin')
 }
 
 export async function setDeliveryEnabled(enabled: boolean) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const admin = createAdminClient()
-  await admin.from('site_settings').update({ delivery_enabled: enabled }).eq('id', 1)
+  await admin.from('site_settings').update({ delivery_enabled: enabled }).eq('branch', branch)
   revalidatePath('/admin')
 }
 
@@ -188,10 +200,10 @@ const STALE_PENDING_HOURS = 24
 // stay in the database (still shows in Total orders, findable via customer
 // history) but drop out of the pending count and out of the revenue total.
 export async function cancelStalePendingOrders() {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const admin = createAdminClient()
   const cutoff = new Date(Date.now() - STALE_PENDING_HOURS * 60 * 60 * 1000).toISOString()
-  await admin.from('orders').update({ status: 'cancelled' }).eq('status', 'pending').lt('created_at', cutoff)
+  await admin.from('orders').update({ status: 'cancelled' }).eq('status', 'pending').eq('branch', branch).lt('created_at', cutoff)
   revalidatePath('/admin')
   revalidatePath('/admin/customers/[phone]', 'page')
 }

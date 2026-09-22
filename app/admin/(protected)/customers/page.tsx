@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { requireAdmin } from '@/lib/admin-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { banCustomer, unbanCustomer } from '@/app/admin/actions'
 
@@ -19,9 +20,10 @@ export default async function AdminCustomersPage({
 }) {
   const { q } = await searchParams
   const query = q?.trim() ?? ''
+  const branch = await requireAdmin()
   const admin = createAdminClient()
 
-  let customersQuery = admin.from('customers').select('*', { count: 'exact' }).order('created_at', { ascending: false })
+  let customersQuery = admin.from('customers').select('*', { count: 'exact' }).eq('branch', branch).order('created_at', { ascending: false })
   customersQuery = query ? customersQuery.ilike('phone', `%${query}%`).limit(200) : customersQuery.limit(CUSTOMERS_LIMIT)
 
   const { data: customers, count: customersCount } = await customersQuery.returns<CustomerRow[]>()

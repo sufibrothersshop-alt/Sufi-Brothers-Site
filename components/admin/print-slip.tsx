@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { branchName, type Branch } from '@/lib/branches'
 
 type SlipItem = { item_name: string; quantity: number; line_total: number }
 type SlipOrder = {
@@ -14,7 +15,7 @@ type SlipOrder = {
   order_items: SlipItem[]
 }
 
-export function PrintSlip({ order }: { order: SlipOrder }) {
+export function PrintSlip({ order, branch }: { order: SlipOrder; branch: Branch }) {
   useEffect(() => {
     // Give the page a beat to finish laying out before opening the print
     // dialog — the closest a browser allows to "automatic" printing
@@ -35,7 +36,7 @@ export function PrintSlip({ order }: { order: SlipOrder }) {
         <div className="text-center">
           <p className="text-xl font-bold">SUFI BROTHERS</p>
           <p className="text-sm">Fast food &amp; more</p>
-          <p className="text-sm">Ghouri Town, Islamabad</p>
+          <p className="text-sm">{branchName(branch)}</p>
         </div>
 
         <div className="my-2 border-t border-dashed border-black" />

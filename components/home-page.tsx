@@ -26,10 +26,11 @@ import { MenuImagePrefetcher } from '@/components/menu-image-prefetcher'
 import { useResolvedMenu, type ResolvedMenuItem } from '@/lib/use-resolved-menu'
 import { useOrderTracker } from '@/lib/use-order-tracker'
 import { useDeliveryStatus } from '@/lib/use-delivery-status'
+import { branchName, type Branch } from '@/lib/branches'
 
-export function HomePage({ initialMenuItems }: { initialMenuItems: ResolvedMenuItem[] }) {
-  const menuItems = useResolvedMenu(initialMenuItems)
-  const deliveryEnabled = useDeliveryStatus()
+export function HomePage({ branch, initialMenuItems }: { branch: Branch; initialMenuItems: ResolvedMenuItem[] }) {
+  const menuItems = useResolvedMenu(branch, initialMenuItems)
+  const deliveryEnabled = useDeliveryStatus(branch)
   const [activeCategory, setActiveCategory] = useState<string>(menuCategories[0])
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<Record<number, number>>({})
@@ -74,7 +75,7 @@ export function HomePage({ initialMenuItems }: { initialMenuItems: ResolvedMenuI
       <MenuImagePrefetcher images={menuItems.map((item) => item.image)} />
       {!deliveryEnabled && <DeliveryOffBanner />}
       <div className="bg-primary px-4 py-2 text-center text-xs font-semibold tracking-wide text-primary-foreground sm:text-sm">
-        Delivery in Ghouri Town — charges confirmed via WhatsApp
+        Delivery from {branchName(branch)} — charges confirmed via WhatsApp
       </div>
 
       <header className="border-b border-border bg-background/95 backdrop-blur">
@@ -98,7 +99,7 @@ export function HomePage({ initialMenuItems }: { initialMenuItems: ResolvedMenuI
 
       <section id="home" className="relative mx-auto grid max-w-7xl items-center gap-10 px-5 pb-16 pt-5 lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:pb-20 lg:pt-8">
         <div className="relative z-10">
-          <p className="mb-5 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-primary"><span className="h-px w-8 bg-primary" /> Fresh from Ghouri Town</p>
+          <p className="mb-5 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-primary"><span className="h-px w-8 bg-primary" /> Fresh from {branchName(branch)}</p>
           <h1 className="max-w-xl font-serif text-5xl font-black leading-[0.98] tracking-tight text-foreground sm:text-6xl lg:text-7xl">Good food.<br /><span className="text-primary">Good mood.</span></h1>
           <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Crave-worthy burgers, shawarmas and roll parathas made fresh for your table. The Sufi Brothers taste is just a call away.</p>
         </div>
@@ -116,15 +117,16 @@ export function HomePage({ initialMenuItems }: { initialMenuItems: ResolvedMenuI
 
       <section id="deals" className="mx-auto max-w-7xl px-5 py-8 lg:px-8"><div className="relative overflow-hidden rounded-[2rem] bg-primary px-7 py-10 text-primary-foreground sm:px-12"><div className="relative z-10 max-w-md"><p className="text-sm font-bold uppercase tracking-[0.18em] text-primary-foreground/70">Sufi Brothers special</p><h2 className="mt-3 font-serif text-4xl font-black leading-tight sm:text-5xl">More bite.<br />Less price.</h2><p className="mt-4 text-sm leading-6 text-primary-foreground/80">Bring your people, pick your favourites and make it a meal to remember.</p><button onClick={() => document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' })} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-secondary px-5 py-3 text-sm font-black text-secondary-foreground">Order now <ArrowRight className="size-4" /></button></div><div className="absolute -right-16 -top-24 size-80 rounded-full border-[28px] border-primary-foreground/10" /><div className="absolute bottom-[-70px] right-8 hidden w-80 rotate-[-8deg] overflow-hidden rounded-3xl border-8 border-primary-foreground/20 shadow-2xl md:block"><img src="/deals/deal-4.webp" alt="Sufi Brothers combo deal" className="h-56 w-full object-cover" /></div></div></section>
 
-      <section id="about" className="mx-auto grid max-w-7xl gap-8 px-5 py-16 lg:grid-cols-3 lg:px-8"><div><p className="text-sm font-bold uppercase tracking-[0.15em] text-primary">Why Sufi Brothers</p><h2 className="mt-2 font-serif text-3xl font-black">Your local comfort food stop.</h2></div><div className="flex gap-4"><span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary"><Clock3 /></span><div><h3 className="font-bold">Always fresh</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">Every order is prepared when you order it, never sitting around.</p></div></div><div className="flex gap-4"><span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary"><MapPin /></span><div><h3 className="font-bold">Proudly in Ghouri Town</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">Serving our neighbours in Islamabad with fast, friendly delivery.</p></div></div></section>
+      <section id="about" className="mx-auto grid max-w-7xl gap-8 px-5 py-16 lg:grid-cols-3 lg:px-8"><div><p className="text-sm font-bold uppercase tracking-[0.15em] text-primary">Why Sufi Brothers</p><h2 className="mt-2 font-serif text-3xl font-black">Your local comfort food stop.</h2></div><div className="flex gap-4"><span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary"><Clock3 /></span><div><h3 className="font-bold">Always fresh</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">Every order is prepared when you order it, never sitting around.</p></div></div><div className="flex gap-4"><span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary"><MapPin /></span><div><h3 className="font-bold">Proudly in {branchName(branch)}</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">Serving our neighbours with fast, friendly delivery.</p></div></div></section>
 
-      <footer id="contact" className="bg-foreground px-5 py-12 text-background lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-3"><span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Utensils className="size-5" /></span><span className="font-serif text-2xl font-black">Sufi Brothers</span></div><p className="mt-4 max-w-xs text-sm leading-6 text-background/60">Big flavours, honest prices, and the kind of food you think about on the way home.</p></div><div className="flex flex-col gap-3 text-sm text-background/70"><a className="flex items-center gap-2 hover:text-background" href="tel:03447575657"><Phone className="size-4 text-primary" />0344-7575657</a><span className="flex items-center gap-2"><MapPin className="size-4 text-primary" />Ghouri Town, Islamabad</span></div></div><div className="mx-auto mt-10 max-w-7xl border-t border-background/10 pt-5 text-xs text-background/40">© 2026 Sufi Brothers. All prices in PKR.</div></footer>
+      <footer id="contact" className="bg-foreground px-5 py-12 text-background lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-3"><span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Utensils className="size-5" /></span><span className="font-serif text-2xl font-black">Sufi Brothers</span></div><p className="mt-4 max-w-xs text-sm leading-6 text-background/60">Big flavours, honest prices, and the kind of food you think about on the way home.</p></div><div className="flex flex-col gap-3 text-sm text-background/70"><a className="flex items-center gap-2 hover:text-background" href="tel:03447575657"><Phone className="size-4 text-primary" />0344-7575657</a><span className="flex items-center gap-2"><MapPin className="size-4 text-primary" />{branchName(branch)}</span></div></div><div className="mx-auto mt-10 max-w-7xl border-t border-background/10 pt-5 text-xs text-background/40">© 2026 Sufi Brothers. All prices in PKR.</div></footer>
 
       {cartCount > 0 && <button onClick={() => setCartOpen(true)} className="fixed bottom-5 left-1/2 z-30 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between rounded-2xl bg-foreground px-4 py-3 text-left text-background shadow-2xl transition hover:brightness-110"><span className="text-sm font-bold">{cartCount} item{cartCount > 1 ? 's' : ''} <span className="font-normal text-background/60">in your order</span></span><span className="flex items-center gap-3"><strong className="text-primary-foreground">Rs. {cartTotal}</strong><span onClick={(e) => { e.stopPropagation(); setCart({}) }} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Clear</span></span></button>}
 
       <CartDialog
         open={cartOpen}
         onOpenChange={setCartOpen}
+        branch={branch}
         menuItems={menuItems}
         cart={cart}
         deliveryEnabled={deliveryEnabled}

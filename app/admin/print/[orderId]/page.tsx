@@ -19,7 +19,7 @@ export default async function PrintSlipPage({
 }: {
   params: Promise<{ orderId: string }>
 }) {
-  await requireAdmin()
+  const branch = await requireAdmin()
   const { orderId } = await params
   const admin = createAdminClient()
 
@@ -27,6 +27,7 @@ export default async function PrintSlipPage({
     .from('orders')
     .select('id, customer_phone, delivery_address, notes, delivery_fee, total_amount, created_at, order_items(item_name, quantity, line_total)')
     .eq('id', orderId)
+    .eq('branch', branch) // don't let one branch's admin print another branch's slip
     .maybeSingle<SlipOrder>()
 
   if (!order) notFound()
@@ -35,5 +36,5 @@ export default async function PrintSlipPage({
     return <p style={{ fontFamily: 'sans-serif', padding: 16 }}>Set the delivery fee for this order before printing the slip.</p>
   }
 
-  return <PrintSlip order={order} />
+  return <PrintSlip order={order} branch={branch} />
 }
