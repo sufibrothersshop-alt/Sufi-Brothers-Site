@@ -2,9 +2,12 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
+// This is the site-wide fallback — each branch's own page
+// (app/[branch]/page.tsx) sets a more specific title/description via
+// generateMetadata, which Next.js merges over this default on that route.
 export const metadata: Metadata = {
-  title: 'Sufi Brothers | Fresh Fast Food in Ghouri Town',
-  description: 'Order fresh burgers, shawarmas, roll parathas and deals from Sufi Brothers in Ghouri Town, Islamabad.',
+  title: 'Sufi Brothers | Fresh Fast Food',
+  description: 'Order fresh burgers, shawarmas, roll parathas and deals from Sufi Brothers. Pick your nearest branch to order.',
   generator: 'v0.app',
   icons: {
     icon: [

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import { requireAdmin } from '@/lib/admin-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { banCustomer, unbanCustomer } from '@/app/admin/actions'
 import { OrderCard, type OrderRow, type RiderInfo } from '@/components/admin/order-card'
@@ -21,17 +22,19 @@ export default async function CustomerDetailPage({
 }) {
   const { phone: rawPhone } = await params
   const phone = decodeURIComponent(rawPhone)
+  const branch = await requireAdmin()
   const admin = createAdminClient()
 
   const [{ data: customer }, { data: orders }, { data: riders }] = await Promise.all([
-    admin.from('customers').select('*').eq('phone', phone).maybeSingle<CustomerRow>(),
+    admin.from('customers').select('*').eq('phone', phone).eq('branch', branch).maybeSingle<CustomerRow>(),
     admin
       .from('orders')
       .select('*, order_items(*), rider:riders(id, name, phone)')
       .eq('customer_phone', phone)
+      .eq('branch', branch)
       .order('created_at', { ascending: false })
       .returns<OrderRow[]>(),
-    admin.from('riders').select('id, name, phone').eq('is_active', true).order('name').returns<RiderInfo[]>(),
+    admin.from('riders').select('id, name, phone').eq('branch', branch).eq('is_active', true).order('name').returns<RiderInfo[]>(),
   ])
 
   if (!customer) notFound()

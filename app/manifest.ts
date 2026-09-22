@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Sufi Brothers | Fresh Fast Food in Ghouri Town',
+    name: 'Sufi Brothers | Fresh Fast Food',
     short_name: 'Sufi Brothers',
-    description: 'Order fresh burgers, shawarmas, roll parathas and deals from Sufi Brothers in Ghouri Town, Islamabad.',
+    description: 'Order fresh burgers, shawarmas, roll parathas and deals from Sufi Brothers. Pick your nearest branch to order.',
     start_url: '/',
     display: 'standalone',
     background_color: '#b00b1a',

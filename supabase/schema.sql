@@ -10,10 +10,29 @@ create extension if not exists pgcrypto;
 drop table if exists public.admins;
 
 -- =========================================================
--- customers — identified by phone number only, no auth/login
+-- branches — each is a fully separate shop: its own menu, orders,
+-- customers, riders, delivery toggle, and admin login. Adding a third
+-- branch later is just another row here (plus its own admin env vars) —
+-- nothing else in this file hardcodes the branch list.
+-- =========================================================
+create table if not exists public.branches (
+  slug text primary key,
+  name text not null
+);
+
+insert into public.branches (slug, name) values
+  ('ghouri-town', 'Ghouri Town'),
+  ('khana', 'Khana')
+on conflict (slug) do nothing;
+
+-- =========================================================
+-- customers — identified by phone number only, no auth/login. A phone
+-- number is a separate customer per branch (fully independent order
+-- history, ban status, etc.) rather than one shared identity, so the
+-- primary key is (phone, branch) instead of just phone.
 -- =========================================================
 create table if not exists public.customers (
-  phone       text primary key check (char_length(trim(phone)) >= 7),
+  phone       text check (char_length(trim(phone)) >= 7),
   name        text,
   is_banned   boolean not null default false,
   ban_reason  text,
@@ -21,6 +40,14 @@ create table if not exists public.customers (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+alter table public.customers add column if not exists branch text not null default 'ghouri-town' references public.branches(slug);
+-- orders' FK depends on this PK, so it has to come off first — safe on a
+-- fresh install too (orders may not exist yet), re-added down in the
+-- orders section as a composite FK.
+alter table if exists public.orders drop constraint if exists orders_customer_phone_fkey;
+alter table public.customers drop constraint if exists customers_pkey;
+alter table public.customers add primary key (phone, branch);
 
 -- =========================================================
 -- riders — delivery staff, managed from the admin panel
@@ -33,18 +60,31 @@ create table if not exists public.riders (
   created_at timestamptz not null default now()
 );
 
+alter table public.riders add column if not exists branch text not null default 'ghouri-town' references public.branches(slug);
+create index if not exists idx_riders_branch on public.riders (branch);
+
 -- =========================================================
--- site_settings — single-row global switches, set from the admin panel.
--- Right now just the delivery on/off toggle.
+-- site_settings — per-branch switches set from the admin panel. Right now
+-- just the delivery on/off toggle. Used to be a single global row (id=1,
+-- checked id=1); migrated below to one row per branch instead.
 -- =========================================================
 create table if not exists public.site_settings (
-  id               integer primary key default 1,
+  id               integer,
   delivery_enabled boolean not null default true,
-  updated_at       timestamptz not null default now(),
-  constraint site_settings_singleton check (id = 1)
+  updated_at       timestamptz not null default now()
 );
 
-insert into public.site_settings (id) values (1) on conflict (id) do nothing;
+alter table public.site_settings add column if not exists branch text references public.branches(slug);
+update public.site_settings set branch = 'ghouri-town' where branch is null and id = 1;
+alter table public.site_settings drop constraint if exists site_settings_singleton;
+alter table public.site_settings drop constraint if exists site_settings_pkey;
+alter table public.site_settings alter column branch set not null;
+alter table public.site_settings add primary key (branch);
+alter table public.site_settings drop column if exists id;
+
+insert into public.site_settings (branch, delivery_enabled) values ('ghouri-town', true) on conflict (branch) do nothing;
+-- New branch starts with delivery OFF until its menu is actually ready to take orders.
+insert into public.site_settings (branch, delivery_enabled) values ('khana', false) on conflict (branch) do nothing;
 
 -- =========================================================
 -- orders
@@ -70,10 +110,19 @@ alter table public.orders add column if not exists longitude double precision;
 alter table public.orders add column if not exists delivery_fee numeric(10, 2) not null default 0;
 alter table public.orders add column if not exists rider_id uuid references public.riders(id);
 
+-- customers' primary key became (phone, branch) above, so the FK here has to
+-- follow — every existing order defaults to 'ghouri-town', the only branch
+-- that existed before this migration.
+alter table public.orders add column if not exists branch text not null default 'ghouri-town' references public.branches(slug);
+alter table public.orders drop constraint if exists orders_customer_phone_fkey;
+alter table public.orders add constraint orders_customer_phone_branch_fkey
+  foreign key (customer_phone, branch) references public.customers(phone, branch);
+
 create index if not exists idx_orders_customer_phone on public.orders (customer_phone);
 create index if not exists idx_orders_status on public.orders (status);
 create index if not exists idx_orders_rider_id on public.orders (rider_id);
 create index if not exists idx_orders_created_at on public.orders (created_at desc);
+create index if not exists idx_orders_branch on public.orders (branch);
 
 -- =========================================================
 -- order_items — price/name snapshot at order time (menu can change later)
@@ -124,6 +173,13 @@ create table if not exists public.menu_items (
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+
+-- Each branch has a fully separate menu — everything seeded below is the
+-- original (only) menu, so it all defaults to 'ghouri-town'. Khana's menu
+-- starts empty; add its items from Khana's own /admin/menu once its admin
+-- login is set up.
+alter table public.menu_items add column if not exists branch text not null default 'ghouri-town' references public.branches(slug);
+create index if not exists idx_menu_items_branch on public.menu_items (branch);
 
 -- One-time seed from the old lib/menu-data.ts array, folding in whatever
 -- was already set in menu_availability at migration time. Explicit ids so
@@ -273,11 +329,12 @@ create trigger trg_site_settings_updated_at
 -- RLS entirely). This keeps customer data and the ban list unreadable from
 -- the browser under all circumstances.
 --
--- menu_availability, menu_items, and site_settings are the exceptions: none
--- of them is sensitive (an in-stock flag, the menu itself, and a single
--- delivery on/off switch), and the public site needs to read them directly,
--- so they get public SELECT policies.
+-- branches, menu_availability, menu_items, and site_settings are the
+-- exceptions: none of them is sensitive (which shops exist, an in-stock
+-- flag, the menu itself, a delivery on/off switch), and the public site
+-- needs to read them directly, so they get public SELECT policies.
 -- =========================================================
+alter table public.branches enable row level security;
 alter table public.customers enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
@@ -285,6 +342,13 @@ alter table public.riders enable row level security;
 alter table public.menu_availability enable row level security;
 alter table public.menu_items enable row level security;
 alter table public.site_settings enable row level security;
+
+drop policy if exists "branches are publicly readable" on public.branches;
+create policy "branches are publicly readable"
+  on public.branches
+  for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "menu items are publicly readable" on public.menu_items;
 create policy "menu items are publicly readable"
@@ -316,12 +380,16 @@ create policy "site settings are publicly readable"
 -- "id" matches menu_items.id and is checked there — a sold-out item can't
 -- be ordered even if the customer's page was open before it was toggled
 -- off, and menu_items.price always overrides the client-sent unit_price.
+-- Every item must belong to p_branch or the whole order is rejected — this
+-- also stops a stale/tampered client sending an id that doesn't exist (which
+-- would otherwise fall back to trusting the client-sent price).
 -- p_latitude/p_longitude are optional (from the browser's geolocation, if the
 -- customer grants permission) — delivery_address is always the primary
 -- human-entered location.
 -- =========================================================
 drop function if exists public.place_order(text, text, text, text, jsonb);
 drop function if exists public.place_order(text, text, text, text, jsonb, double precision, double precision);
+drop function if exists public.place_order(text, text, text, text, jsonb, text, double precision, double precision);
 
 create or replace function public.place_order(
   p_phone     text,
@@ -329,6 +397,7 @@ create or replace function public.place_order(
   p_address   text,
   p_notes     text,
   p_items     jsonb,
+  p_branch    text,
   p_latitude  double precision default null,
   p_longitude double precision default null
 )
@@ -344,8 +413,13 @@ declare
   v_delivery_fee   numeric(10, 2);
   v_total          numeric(10, 2);
   v_sold_out_names text;
+  v_invalid_names  text;
 begin
-  if not coalesce((select delivery_enabled from public.site_settings where id = 1), true) then
+  if p_branch is null or not exists (select 1 from public.branches where slug = p_branch) then
+    raise exception 'Unknown branch.';
+  end if;
+
+  if not coalesce((select delivery_enabled from public.site_settings where branch = p_branch), true) then
     raise exception 'Sorry, we are not taking orders right now. Please try again later.';
   end if;
 
@@ -361,19 +435,31 @@ begin
     raise exception 'Order must contain at least one item.';
   end if;
 
+  select string_agg(coalesce(item->>'name', item->>'id'), ', ')
+  into v_invalid_names
+  from jsonb_array_elements(p_items) as item
+  where not exists (
+    select 1 from public.menu_items mi
+    where mi.id = (item->>'id')::bigint and mi.branch = p_branch
+  );
+
+  if v_invalid_names is not null then
+    raise exception 'These items are not on this branch''s menu: %', v_invalid_names;
+  end if;
+
   select string_agg(item->>'name', ', ')
   into v_sold_out_names
   from jsonb_array_elements(p_items) as item
-  join public.menu_items mi on mi.id = (item->>'id')::bigint
+  join public.menu_items mi on mi.id = (item->>'id')::bigint and mi.branch = p_branch
   where mi.is_available = false;
 
   if v_sold_out_names is not null then
     raise exception 'Sorry, these items just sold out: %', v_sold_out_names;
   end if;
 
-  insert into public.customers (phone, name)
-  values (trim(p_phone), nullif(trim(p_name), ''))
-  on conflict (phone) do update
+  insert into public.customers (phone, branch, name)
+  values (trim(p_phone), p_branch, nullif(trim(p_name), ''))
+  on conflict (phone, branch) do update
     set name = coalesce(nullif(trim(excluded.name), ''), public.customers.name)
   returning is_banned into v_is_banned;
 
@@ -383,19 +469,19 @@ begin
 
   -- menu_items.price always wins over whatever price the client sent, so a
   -- stale page can't under-charge (or over-charge) against the admin's
-  -- current rate.
+  -- current rate. (The validation above already guarantees a match exists.)
   select sum(coalesce(mi.price, (item->>'unit_price')::numeric) * (item->>'quantity')::integer)
   into v_subtotal
   from jsonb_array_elements(p_items) as item
-  left join public.menu_items mi on mi.id = (item->>'id')::bigint;
+  left join public.menu_items mi on mi.id = (item->>'id')::bigint and mi.branch = p_branch;
 
   -- Delivery charge isn't collected from the customer at order time — it's
   -- confirmed over WhatsApp and set by the admin per order afterwards.
   v_delivery_fee := 0;
   v_total := v_subtotal + v_delivery_fee;
 
-  insert into public.orders (customer_phone, delivery_address, latitude, longitude, notes, delivery_fee, total_amount)
-  values (trim(p_phone), trim(p_address), p_latitude, p_longitude, nullif(trim(p_notes), ''), v_delivery_fee, v_total)
+  insert into public.orders (customer_phone, branch, delivery_address, latitude, longitude, notes, delivery_fee, total_amount)
+  values (trim(p_phone), p_branch, trim(p_address), p_latitude, p_longitude, nullif(trim(p_notes), ''), v_delivery_fee, v_total)
   returning id into v_order_id;
 
   insert into public.order_items (order_id, item_name, item_category, unit_price, quantity)
@@ -406,13 +492,13 @@ begin
     coalesce(mi.price, (item->>'unit_price')::numeric),
     (item->>'quantity')::integer
   from jsonb_array_elements(p_items) as item
-  left join public.menu_items mi on mi.id = (item->>'id')::bigint;
+  left join public.menu_items mi on mi.id = (item->>'id')::bigint and mi.branch = p_branch;
 
   return v_order_id;
 end;
 $$;
 
-grant execute on function public.place_order(text, text, text, text, jsonb, double precision, double precision) to anon, authenticated;
+grant execute on function public.place_order(text, text, text, text, jsonb, text, double precision, double precision) to anon, authenticated;
 
 -- =========================================================
 -- get_customer_info — lets the checkout form recognize a returning
@@ -427,7 +513,9 @@ grant execute on function public.place_order(text, text, text, text, jsonb, doub
 -- back, the same way any "recognize returning caller" lookup works.
 -- Banned numbers get no match, so the checkout form treats them as unknown.
 -- =========================================================
-create or replace function public.get_customer_info(p_phone text)
+drop function if exists public.get_customer_info(text);
+
+create or replace function public.get_customer_info(p_phone text, p_branch text)
 returns table (name text, delivery_address text)
 language plpgsql
 security definer
@@ -440,15 +528,15 @@ begin
   left join lateral (
     select o2.delivery_address
     from public.orders o2
-    where o2.customer_phone = c.phone and o2.delivery_address is not null
+    where o2.customer_phone = c.phone and o2.branch = c.branch and o2.delivery_address is not null
     order by o2.created_at desc
     limit 1
   ) o on true
-  where c.phone = trim(p_phone) and c.is_banned = false;
+  where c.phone = trim(p_phone) and c.branch = p_branch and c.is_banned = false;
 end;
 $$;
 
-grant execute on function public.get_customer_info(text) to anon, authenticated;
+grant execute on function public.get_customer_info(text, text) to anon, authenticated;
 
 -- =========================================================
 -- get_order_status — lets the customer's own order-tracker widget poll for
@@ -476,6 +564,10 @@ $$;
 grant execute on function public.get_order_status(uuid) to anon, authenticated;
 
 -- =========================================================
--- Admin login setup: nothing to run here. Set ADMIN_USERNAME, ADMIN_PASSWORD,
--- and ADMIN_SESSION_SECRET in .env.local — see .env.example.
+-- Admin login setup: nothing to run here. Each branch is a separate
+-- username/password pair in env vars, checked entirely outside the
+-- database (see lib/admin-auth.ts):
+--   Ghouri Town: ADMIN_USERNAME, ADMIN_PASSWORD           (already set)
+--   Khana:       ADMIN_KHANA_USERNAME, ADMIN_KHANA_PASSWORD (add these)
+-- Both branches share ADMIN_SESSION_SECRET. See .env.example.
 -- =========================================================

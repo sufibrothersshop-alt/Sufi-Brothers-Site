@@ -1,11 +1,13 @@
+import { requireAdmin } from '@/lib/admin-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { addRider, setRiderActive } from '@/app/admin/actions'
 
 type RiderRow = { id: string; name: string; phone: string; is_active: boolean; created_at: string }
 
 export default async function AdminRidersPage() {
+  const branch = await requireAdmin()
   const admin = createAdminClient()
-  const { data: riders } = await admin.from('riders').select('*').order('created_at', { ascending: false }).returns<RiderRow[]>()
+  const { data: riders } = await admin.from('riders').select('*').eq('branch', branch).order('created_at', { ascending: false }).returns<RiderRow[]>()
 
   return (
     <div className="flex flex-col gap-8">

@@ -6,10 +6,12 @@ import { CheckCircle2, LocateFixed, Minus, Plus, ShoppingBag, Trash2, X } from '
 import type { ResolvedMenuItem } from '@/lib/use-resolved-menu'
 import { createClient } from '@/lib/supabase/client'
 import { useRememberedCustomer } from '@/lib/use-remembered-customer'
+import type { Branch } from '@/lib/branches'
 
 type CartDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  branch: Branch
   menuItems: ResolvedMenuItem[]
   cart: Record<number, number>
   deliveryEnabled: boolean
@@ -20,7 +22,7 @@ type CartDialogProps = {
   onOrderPlaced?: (orderId: string, total: number) => void
 }
 
-export function CartDialog({ open, onOpenChange, menuItems, cart, deliveryEnabled, onIncrement, onDecrement, onRemove, onClear, onOrderPlaced }: CartDialogProps) {
+export function CartDialog({ open, onOpenChange, branch, menuItems, cart, deliveryEnabled, onIncrement, onDecrement, onRemove, onClear, onOrderPlaced }: CartDialogProps) {
   const lines = Object.entries(cart)
     .map(([id, quantity]) => ({ dish: menuItems.find((item) => item.id === Number(id)), quantity }))
     .filter((line): line is { dish: NonNullable<typeof line.dish>; quantity: number } => !!line.dish && line.quantity > 0)
@@ -48,7 +50,7 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, deliveryEnable
     if (!open || phone.trim().length < 10) return
     const timeout = setTimeout(async () => {
       const supabase = createClient()
-      const { data } = await supabase.rpc('get_customer_info', { p_phone: phone.trim() })
+      const { data } = await supabase.rpc('get_customer_info', { p_phone: phone.trim(), p_branch: branch })
       const match = data?.[0]
       if (!match) return
       setCustomerInfo((c) => ({
@@ -58,7 +60,7 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, deliveryEnable
       }))
     }, 600)
     return () => clearTimeout(timeout)
-  }, [open, phone, setCustomerInfo])
+  }, [open, phone, branch, setCustomerInfo])
 
   useEffect(() => {
     if (open) {
@@ -102,6 +104,7 @@ export function CartDialog({ open, onOpenChange, menuItems, cart, deliveryEnable
       p_address: address.trim(),
       p_notes: notes.trim() || null,
       p_items: lines.map(({ dish, quantity }) => ({ id: dish.id, name: dish.name, category: dish.category, unit_price: dish.price, quantity })),
+      p_branch: branch,
       p_latitude: coords?.lat ?? null,
       p_longitude: coords?.lng ?? null,
     })
