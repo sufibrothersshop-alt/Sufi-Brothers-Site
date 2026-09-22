@@ -10,6 +10,11 @@ export type MenuItem = {
   image: string | null
 }
 
+// The original (Ghouri Town) category set — still used to order/emoji any
+// category that happens to match one of these names. Branches aren't
+// limited to this list: admins can type a brand-new category name straight
+// into the "Add item" form (see components/admin/menu-availability.tsx),
+// and categoriesFromItems below picks it up automatically.
 export const categories = [
   'Deals',
   'Burgers',
@@ -32,4 +37,23 @@ export const categoryEmoji: Record<string, string> = {
   'Ice Cream': '🍨',
   'Juices & Shakes': '🥤',
   'Cold Drinks': '🧊',
+}
+
+const DEFAULT_CATEGORY_EMOJI = '🍽️'
+
+// Falls back to a generic plate icon for a category this branch made up
+// that isn't in the list above.
+export function getCategoryEmoji(category: string): string {
+  return categoryEmoji[category] ?? DEFAULT_CATEGORY_EMOJI
+}
+
+// Distinct categories actually present in this branch's items, ordered so
+// the original Ghouri Town categories keep their familiar order first, and
+// any category an admin made up gets appended after, in the order it first
+// appears (i.e. whenever its first item was added).
+export function categoriesFromItems(items: { category: string }[]): string[] {
+  const present = new Set(items.map((item) => item.category))
+  const known = categories.filter((c) => present.has(c))
+  const custom = [...present].filter((c) => !(categories as readonly string[]).includes(c))
+  return [...known, ...custom]
 }

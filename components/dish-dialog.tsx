@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { Minus, Plus, X } from 'lucide-react'
 import type { MenuItem } from '@/lib/menu-data'
-import { categoryEmoji } from '@/lib/menu-data'
+import { getCategoryEmoji } from '@/lib/menu-data'
 
 type DishDialogProps = {
   dish: MenuItem | null
@@ -33,7 +33,7 @@ export function DishDialog({ dish, available, open, onOpenChange, onAddToCart }:
               {dish.image ? (
                 <img src={dish.image} alt={dish.name} className={`h-full w-full object-contain p-8 ${available ? '' : 'opacity-50 grayscale'}`} />
               ) : (
-                <div className={`flex h-full w-full items-center justify-center text-7xl ${available ? '' : 'opacity-50 grayscale'}`}>{categoryEmoji[dish.category]}</div>
+                <div className={`flex h-full w-full items-center justify-center text-7xl ${available ? '' : 'opacity-50 grayscale'}`}>{getCategoryEmoji(dish.category)}</div>
               )}
               {!available && <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-foreground/80 py-2 text-center text-xs font-black uppercase tracking-widest text-background">Sold out</span>}
               <Dialog.Close
