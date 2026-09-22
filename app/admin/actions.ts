@@ -179,3 +179,19 @@ export async function setDeliveryEnabled(enabled: boolean) {
   await admin.from('site_settings').update({ delivery_enabled: enabled }).eq('id', 1)
   revalidatePath('/admin')
 }
+
+const STALE_PENDING_HOURS = 24
+
+// Clears the pending-orders backlog by cancelling (not deleting) anything
+// that's been sitting in 'pending' for a day or more — a real order placed
+// minutes ago is never touched even if this is clicked mid-shift. Records
+// stay in the database (still shows in Total orders, findable via customer
+// history) but drop out of the pending count and out of the revenue total.
+export async function cancelStalePendingOrders() {
+  await requireAdmin()
+  const admin = createAdminClient()
+  const cutoff = new Date(Date.now() - STALE_PENDING_HOURS * 60 * 60 * 1000).toISOString()
+  await admin.from('orders').update({ status: 'cancelled' }).eq('status', 'pending').lt('created_at', cutoff)
+  revalidatePath('/admin')
+  revalidatePath('/admin/customers/[phone]', 'page')
+}

@@ -3,9 +3,11 @@ import { setDeliveryEnabled } from '@/app/admin/actions'
 import { OrderCard, type OrderRow, type RiderInfo } from '@/components/admin/order-card'
 import { StatTile } from '@/components/admin/stat-tile'
 import { AutoPrintNewOrders } from '@/components/admin/auto-print-new-orders'
+import { ResetStalePendingOrders } from '@/components/admin/reset-stale-pending'
 
 const RECENT_ORDERS_LIMIT = 50
 const PAGE_SIZE = 1000 // Supabase's API never returns more rows than this per request
+const STALE_PENDING_HOURS = 24
 
 // A plain `select('status, total_amount')` silently stops at PAGE_SIZE rows, so
 // summing it froze "Total orders" at 1000 and undercounted pending + revenue.
@@ -41,7 +43,9 @@ async function getOrderStats(admin: ReturnType<typeof createAdminClient>) {
 export default async function AdminOrdersPage() {
   const admin = createAdminClient()
 
-  const [{ data: recentOrders }, { totalOrders, pendingOrders, revenue }, { count: bannedCount }, { data: riders }, { data: settings }] = await Promise.all([
+  const staleCutoff = new Date(Date.now() - STALE_PENDING_HOURS * 60 * 60 * 1000).toISOString()
+
+  const [{ data: recentOrders }, { totalOrders, pendingOrders, revenue }, { count: bannedCount }, { data: riders }, { data: settings }, { count: stalePendingCount }] = await Promise.all([
     admin
       .from('orders')
       .select('*, order_items(*), rider:riders(id, name, phone)')
@@ -52,6 +56,7 @@ export default async function AdminOrdersPage() {
     admin.from('customers').select('*', { count: 'exact', head: true }).eq('is_banned', true),
     admin.from('riders').select('id, name, phone').eq('is_active', true).order('name').returns<RiderInfo[]>(),
     admin.from('site_settings').select('delivery_enabled').eq('id', 1).maybeSingle<{ delivery_enabled: boolean }>(),
+    admin.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending').lt('created_at', staleCutoff),
   ])
 
   const deliveryEnabled = settings?.delivery_enabled ?? true
@@ -86,6 +91,16 @@ export default async function AdminOrdersPage() {
         <StatTile label="Revenue" value={revenue === null ? '—' : `Rs. ${revenue}`} tone="gold" />
         <StatTile label="Banned customers" value={String(bannedCount ?? 0)} tone="plain" />
       </section>
+
+      {stalePendingCount !== null && stalePendingCount > 0 && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Stuck pending orders</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{stalePendingCount} pending order{stalePendingCount > 1 ? 's have' : ' has'} sat untouched for over 24 hours — likely stale or test orders.</p>
+          </div>
+          <ResetStalePendingOrders count={stalePendingCount} />
+        </section>
+      )}
 
       <section>
         <h2 className="mb-4 font-serif text-xl font-black">
