@@ -42,6 +42,10 @@ create table if not exists public.customers (
 );
 
 alter table public.customers add column if not exists branch text not null default 'ghouri-town' references public.branches(slug);
+-- orders' FK depends on this PK, so it has to come off first — safe on a
+-- fresh install too (orders may not exist yet), re-added down in the
+-- orders section as a composite FK.
+alter table if exists public.orders drop constraint if exists orders_customer_phone_fkey;
 alter table public.customers drop constraint if exists customers_pkey;
 alter table public.customers add primary key (phone, branch);
 
