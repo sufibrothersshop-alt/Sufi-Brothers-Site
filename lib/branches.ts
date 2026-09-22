@@ -6,9 +6,9 @@
 // branch-picker page and admin auth both need this.
 export type Branch = 'ghouri-town' | 'khana'
 
-export const BRANCHES: { slug: Branch; name: string }[] = [
-  { slug: 'ghouri-town', name: 'Ghouri Town' },
-  { slug: 'khana', name: 'Khana' },
+export const BRANCHES: { slug: Branch; name: string; phone: string }[] = [
+  { slug: 'ghouri-town', name: 'Ghouri Town', phone: '03447575657' },
+  { slug: 'khana', name: 'Khana', phone: '03455411094' },
 ]
 
 export function isBranch(value: string): value is Branch {
@@ -17,4 +17,15 @@ export function isBranch(value: string): value is Branch {
 
 export function branchName(slug: Branch) {
   return BRANCHES.find((b) => b.slug === slug)?.name ?? slug
+}
+
+// Raw digits, no formatting — for tel: links.
+export function branchPhone(slug: Branch) {
+  return BRANCHES.find((b) => b.slug === slug)?.phone ?? ''
+}
+
+// "0345-5411094" style, for display.
+export function branchPhoneDisplay(slug: Branch) {
+  const phone = branchPhone(slug)
+  return phone.length === 11 ? `${phone.slice(0, 4)}-${phone.slice(4)}` : phone
 }

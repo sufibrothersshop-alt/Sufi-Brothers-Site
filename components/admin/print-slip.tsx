@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { branchName, type Branch } from '@/lib/branches'
+import { branchName, branchPhoneDisplay, type Branch } from '@/lib/branches'
 
 type SlipItem = { item_name: string; quantity: number; line_total: number }
 type SlipOrder = {
@@ -79,7 +79,7 @@ export function PrintSlip({ order, branch }: { order: SlipOrder; branch: Branch 
 
         <div className="text-center">
           <p>Thank you for ordering!</p>
-          <p>0344-7575657</p>
+          <p>{branchPhoneDisplay(branch)}</p>
         </div>
       </div>
     </>
