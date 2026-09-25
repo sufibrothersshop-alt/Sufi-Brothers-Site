@@ -49,5 +49,8 @@ export default async function Page({ params }: { params: Promise<{ branch: strin
 
   const initialMenuItems: ResolvedMenuItem[] = (data ?? []).map(toResolvedMenuItem)
 
-  return <HomePage branch={branch} initialMenuItems={initialMenuItems} />
+  const { data: iconRows } = await admin.from('category_icons').select('category, emoji').eq('branch', branch)
+  const initialCategoryIcons: Record<string, string> = Object.fromEntries((iconRows ?? []).map((row) => [row.category, row.emoji]))
+
+  return <HomePage branch={branch} initialMenuItems={initialMenuItems} initialCategoryIcons={initialCategoryIcons} />
 }

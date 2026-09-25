@@ -328,6 +328,30 @@ create policy "menu item option choices are publicly readable"
   to anon, authenticated
   using (true);
 
+-- =========================================================
+-- category_icons — lets an admin assign a custom emoji to a category
+-- (mainly for categories they typed themselves in "Add item", which would
+-- otherwise fall back to the generic plate icon in lib/menu-data.ts).
+-- Branch-scoped since each branch has its own category set; deleting the
+-- branch cleans these up.
+-- =========================================================
+create table if not exists public.category_icons (
+  branch     text not null references public.branches(slug) on delete cascade,
+  category   text not null,
+  emoji      text not null,
+  created_at timestamptz not null default now(),
+  primary key (branch, category)
+);
+
+alter table public.category_icons enable row level security;
+
+drop policy if exists "category icons are publicly readable" on public.category_icons;
+create policy "category icons are publicly readable"
+  on public.category_icons
+  for select
+  to anon, authenticated
+  using (true);
+
 -- Storage bucket for admin-uploaded item photos (public read, so <img src>
 -- can hit the CDN URL directly with no auth). Writes only ever happen
 -- through the service-role admin client, which bypasses storage RLS

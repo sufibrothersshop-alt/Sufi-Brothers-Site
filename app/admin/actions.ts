@@ -166,6 +166,25 @@ export async function deleteMenuItem(itemId: number) {
   revalidatePath(`/${branch}`)
 }
 
+// An admin's own emoji for a category (e.g. one they typed into "Add item"
+// that isn't in the built-in map) — see the category_icons table and
+// lib/menu-data.ts's getCategoryEmoji. Branch-scoped: category is whatever
+// text is on that branch's menu_items.category, not a separate id, so no
+// extra ownership check is needed beyond keying every write to this admin's
+// own branch. Blank emoji removes the override (reverts to the default icon).
+export async function setCategoryIcon(category: string, formData: FormData) {
+  const branch = await requireAdmin()
+  const emoji = String(formData.get('emoji') ?? '').trim()
+  const admin = createAdminClient()
+  if (!emoji) {
+    await admin.from('category_icons').delete().eq('branch', branch).eq('category', category)
+  } else {
+    await admin.from('category_icons').upsert({ branch, category, emoji }, { onConflict: 'branch,category' })
+  }
+  revalidatePath('/admin/menu')
+  revalidatePath(`/${branch}`)
+}
+
 export async function addRider(formData: FormData) {
   const branch = await requireAdmin()
   const name = String(formData.get('name') ?? '').trim()

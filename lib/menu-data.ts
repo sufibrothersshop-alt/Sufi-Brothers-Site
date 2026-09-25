@@ -62,10 +62,12 @@ export const categoryEmoji: Record<string, string> = {
 
 const DEFAULT_CATEGORY_EMOJI = '🍽️'
 
-// Falls back to a generic plate icon for a category this branch made up
-// that isn't in the list above.
-export function getCategoryEmoji(category: string): string {
-  return categoryEmoji[category] ?? DEFAULT_CATEGORY_EMOJI
+// `overrides` is a branch's admin-assigned icons (category_icons table, see
+// lib/use-category-icons.ts) — checked first so an admin's own choice always
+// wins. Falls back to the built-in map, then a generic plate icon for a
+// category nobody's assigned an icon to yet.
+export function getCategoryEmoji(category: string, overrides: Record<string, string> = {}): string {
+  return overrides[category] ?? categoryEmoji[category] ?? DEFAULT_CATEGORY_EMOJI
 }
 
 // Distinct categories actually present in this branch's items, ordered so

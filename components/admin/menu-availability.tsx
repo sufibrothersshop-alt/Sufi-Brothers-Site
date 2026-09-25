@@ -11,6 +11,7 @@ import {
   deleteMenuItem,
   deleteOptionChoice,
   deleteOptionGroup,
+  setCategoryIcon,
   setItemAvailability,
   updateItemPrice,
 } from '@/app/admin/actions'
@@ -156,7 +157,35 @@ function OptionGroupsEditor({ item }: { item: ResolvedMenuItem }) {
   )
 }
 
-export function MenuManagementSection({ items }: { items: ResolvedMenuItem[] }) {
+// One category's emoji, editable inline. `override` is the raw
+// category_icons value for this category on this branch (blank if none set
+// yet), kept separate from the resolved/displayed emoji so the input starts
+// empty for a category still on the default icon rather than showing it as
+// if it were a saved override.
+function CategoryIconForm({ category, resolvedEmoji, override }: { category: string; resolvedEmoji: string; override: string }) {
+  const [formKey, setFormKey] = useState(0)
+  const handleSubmit = async (formData: FormData) => {
+    await setCategoryIcon(category, formData)
+    setFormKey((k) => k + 1)
+  }
+  return (
+    <form key={formKey} action={handleSubmit} className="flex items-center gap-2 rounded-xl border border-border bg-card p-2.5 shadow-sm">
+      <span className="text-xl" aria-hidden>{resolvedEmoji}</span>
+      <span className="flex-1 truncate text-xs font-bold">{category}</span>
+      <input
+        name="emoji"
+        defaultValue={override}
+        placeholder="🍕"
+        title="Paste an emoji to use for this category, or leave blank to reset to the default icon"
+        maxLength={8}
+        className="w-14 rounded-lg border border-border bg-background px-2 py-1 text-center text-sm outline-none focus:border-primary"
+      />
+      <button type="submit" className="rounded-lg bg-primary px-2 py-1 text-[10px] font-bold text-primary-foreground">Save</button>
+    </form>
+  )
+}
+
+export function MenuManagementSection({ items, categoryIcons = {} }: { items: ResolvedMenuItem[]; categoryIcons?: Record<string, string> }) {
   const existingCategories = categoriesFromItems(items)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   // Falls back to the first real category once items load, without forcing
@@ -174,6 +203,20 @@ export function MenuManagementSection({ items }: { items: ResolvedMenuItem[] }) 
         <p className="text-sm text-muted-foreground">No items yet — add the first one above. Typing a new category name creates it.</p>
       ) : (
         <>
+          <div className="mb-6">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Category icons</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {existingCategories.map((category) => (
+                <CategoryIconForm
+                  key={category}
+                  category={category}
+                  resolvedEmoji={getCategoryEmoji(category, categoryIcons)}
+                  override={categoryIcons[category] ?? ''}
+                />
+              ))}
+            </div>
+          </div>
+
           <div className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm">
             {existingCategories.map((category) => {
               const count = items.filter((item) => item.category === category).length
@@ -186,7 +229,7 @@ export function MenuManagementSection({ items }: { items: ResolvedMenuItem[] }) 
                     currentCategory === category ? 'bg-secondary text-secondary-foreground shadow-sm' : 'bg-background text-muted-foreground hover:bg-secondary/30'
                   }`}
                 >
-                  <span>{getCategoryEmoji(category)}</span>
+                  <span>{getCategoryEmoji(category, categoryIcons)}</span>
                   {category}
                   <span className="text-xs opacity-60">({count})</span>
                 </button>

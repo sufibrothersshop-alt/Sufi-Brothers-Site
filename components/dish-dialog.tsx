@@ -13,9 +13,10 @@ type DishDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onAddToCart: (id: number, choiceIds: number[], quantity: number) => void
+  categoryIcons?: Record<string, string>
 }
 
-export function DishDialog({ dish, available, open, onOpenChange, onAddToCart }: DishDialogProps) {
+export function DishDialog({ dish, available, open, onOpenChange, onAddToCart, categoryIcons }: DishDialogProps) {
   const [quantity, setQuantity] = useState(1)
   // groupId -> chosen choiceId. Reset whenever a different dish opens so a
   // previous dish's picks never leak onto this one.
@@ -45,7 +46,7 @@ export function DishDialog({ dish, available, open, onOpenChange, onAddToCart }:
               {dish.image ? (
                 <img src={dish.image} alt={dish.name} className={`h-full w-full object-contain p-8 ${available ? '' : 'opacity-50 grayscale'}`} />
               ) : (
-                <div className={`flex h-full w-full items-center justify-center text-7xl ${available ? '' : 'opacity-50 grayscale'}`}>{getCategoryEmoji(dish.category)}</div>
+                <div className={`flex h-full w-full items-center justify-center text-7xl ${available ? '' : 'opacity-50 grayscale'}`}>{getCategoryEmoji(dish.category, categoryIcons)}</div>
               )}
               {!available && <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-foreground/80 py-2 text-center text-xs font-black uppercase tracking-widest text-background">Sold out</span>}
               <Dialog.Close

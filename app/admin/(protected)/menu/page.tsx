@@ -14,5 +14,8 @@ export default async function AdminMenuPage() {
     .order('id')
     .returns<MenuItemRow[]>()
 
-  return <MenuManagementSection items={(data ?? []).map(toResolvedMenuItem)} />
+  const { data: iconRows } = await admin.from('category_icons').select('category, emoji').eq('branch', branch)
+  const categoryIcons: Record<string, string> = Object.fromEntries((iconRows ?? []).map((row) => [row.category, row.emoji]))
+
+  return <MenuManagementSection items={(data ?? []).map(toResolvedMenuItem)} categoryIcons={categoryIcons} />
 }
