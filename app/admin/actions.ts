@@ -207,3 +207,64 @@ export async function cancelStalePendingOrders() {
   revalidatePath('/admin')
   revalidatePath('/admin/customers/[phone]', 'page')
 }
+
+// Variant questions on a menu item — e.g. a pizza's "Size" (required) or
+// "Extra toppings" (optional) group, each with its own priced choices. Every
+// write below re-verifies ownership down to the branch (item -> group ->
+// choice) with plain sequential lookups rather than a nested embed filter,
+// so one admin can never attach or delete another branch's options even by
+// guessing an id.
+
+export async function addOptionGroup(itemId: number, formData: FormData) {
+  const branch = await requireAdmin()
+  const name = String(formData.get('name') ?? '').trim()
+  if (!name) return
+  const required = formData.get('required') === 'on'
+  const admin = createAdminClient()
+  const { data: item } = await admin.from('menu_items').select('id').eq('id', itemId).eq('branch', branch).maybeSingle()
+  if (!item) return
+  await admin.from('menu_item_option_groups').insert({ menu_item_id: itemId, name, required })
+  revalidatePath('/admin/menu')
+  revalidatePath(`/${branch}`)
+}
+
+export async function deleteOptionGroup(groupId: number) {
+  const branch = await requireAdmin()
+  const admin = createAdminClient()
+  const { data: group } = await admin.from('menu_item_option_groups').select('id, menu_item_id').eq('id', groupId).maybeSingle()
+  if (!group) return
+  const { data: item } = await admin.from('menu_items').select('id').eq('id', group.menu_item_id).eq('branch', branch).maybeSingle()
+  if (!item) return
+  await admin.from('menu_item_option_groups').delete().eq('id', groupId)
+  revalidatePath('/admin/menu')
+  revalidatePath(`/${branch}`)
+}
+
+export async function addOptionChoice(groupId: number, formData: FormData) {
+  const branch = await requireAdmin()
+  const name = String(formData.get('name') ?? '').trim()
+  const priceDelta = Number(formData.get('price_delta') || 0)
+  if (!name || !Number.isFinite(priceDelta)) return
+  const admin = createAdminClient()
+  const { data: group } = await admin.from('menu_item_option_groups').select('id, menu_item_id').eq('id', groupId).maybeSingle()
+  if (!group) return
+  const { data: item } = await admin.from('menu_items').select('id').eq('id', group.menu_item_id).eq('branch', branch).maybeSingle()
+  if (!item) return
+  await admin.from('menu_item_option_choices').insert({ option_group_id: groupId, name, price_delta: priceDelta })
+  revalidatePath('/admin/menu')
+  revalidatePath(`/${branch}`)
+}
+
+export async function deleteOptionChoice(choiceId: number) {
+  const branch = await requireAdmin()
+  const admin = createAdminClient()
+  const { data: choice } = await admin.from('menu_item_option_choices').select('id, option_group_id').eq('id', choiceId).maybeSingle()
+  if (!choice) return
+  const { data: group } = await admin.from('menu_item_option_groups').select('id, menu_item_id').eq('id', choice.option_group_id).maybeSingle()
+  if (!group) return
+  const { data: item } = await admin.from('menu_items').select('id').eq('id', group.menu_item_id).eq('branch', branch).maybeSingle()
+  if (!item) return
+  await admin.from('menu_item_option_choices').delete().eq('id', choiceId)
+  revalidatePath('/admin/menu')
+  revalidatePath(`/${branch}`)
+}

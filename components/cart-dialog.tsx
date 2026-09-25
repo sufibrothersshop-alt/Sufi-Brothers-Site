@@ -7,27 +7,28 @@ import type { ResolvedMenuItem } from '@/lib/use-resolved-menu'
 import { createClient } from '@/lib/supabase/client'
 import { useRememberedCustomer } from '@/lib/use-remembered-customer'
 import type { Branch } from '@/lib/branches'
+import { lineOptionsSummary, lineUnitPrice, type CartLine } from '@/lib/cart'
 
 type CartDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   branch: Branch
   menuItems: ResolvedMenuItem[]
-  cart: Record<number, number>
+  cart: Record<string, CartLine>
   deliveryEnabled: boolean
-  onIncrement: (id: number) => void
-  onDecrement: (id: number) => void
-  onRemove: (id: number) => void
+  onIncrement: (key: string) => void
+  onDecrement: (key: string) => void
+  onRemove: (key: string) => void
   onClear: () => void
   onOrderPlaced?: (orderId: string, total: number) => void
 }
 
 export function CartDialog({ open, onOpenChange, branch, menuItems, cart, deliveryEnabled, onIncrement, onDecrement, onRemove, onClear, onOrderPlaced }: CartDialogProps) {
-  const lines = Object.entries(cart)
-    .map(([id, quantity]) => ({ dish: menuItems.find((item) => item.id === Number(id)), quantity }))
-    .filter((line): line is { dish: NonNullable<typeof line.dish>; quantity: number } => !!line.dish && line.quantity > 0)
+  const lines = Object.values(cart)
+    .map((line) => ({ dish: menuItems.find((item) => item.id === line.itemId), line }))
+    .filter((entry): entry is { dish: NonNullable<typeof entry.dish>; line: CartLine } => !!entry.dish && entry.line.quantity > 0)
 
-  const subtotal = lines.reduce((sum, line) => sum + line.dish.price * line.quantity, 0)
+  const subtotal = lines.reduce((sum, { dish, line }) => sum + lineUnitPrice(dish, line.choiceIds) * line.quantity, 0)
   const total = subtotal
 
   const [customerInfo, setCustomerInfo] = useRememberedCustomer()
@@ -103,7 +104,14 @@ export function CartDialog({ open, onOpenChange, branch, menuItems, cart, delive
       p_name: name.trim() || null,
       p_address: address.trim(),
       p_notes: notes.trim() || null,
-      p_items: lines.map(({ dish, quantity }) => ({ id: dish.id, name: dish.name, category: dish.category, unit_price: dish.price, quantity })),
+      p_items: lines.map(({ dish, line }) => ({
+        id: dish.id,
+        name: dish.name,
+        category: dish.category,
+        unit_price: lineUnitPrice(dish, line.choiceIds),
+        quantity: line.quantity,
+        option_choice_ids: line.choiceIds,
+      })),
       p_branch: branch,
       p_latitude: coords?.lat ?? null,
       p_longitude: coords?.lng ?? null,
@@ -149,29 +157,34 @@ export function CartDialog({ open, onOpenChange, branch, menuItems, cart, delive
             ) : (
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 <ul className="flex flex-col gap-4">
-                  {lines.map(({ dish, quantity }) => (
-                    <li key={dish.id} className="flex items-center gap-3">
-                      <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-secondary/30">
-                        {dish.image ? <img src={dish.image} alt={dish.name} className="h-full w-full object-contain p-1.5" /> : <ShoppingBag className="size-6 text-muted-foreground" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold">{dish.name}</p>
-                        <p className="text-xs text-muted-foreground">Rs. {dish.price} each</p>
-                      </div>
-                      <div className="flex items-center gap-2 rounded-xl border border-border p-1">
-                        <button aria-label={`Decrease ${dish.name}`} onClick={() => onDecrement(dish.id)} className="flex size-7 items-center justify-center rounded-lg transition hover:bg-secondary">
-                          <Minus className="size-3.5" />
+                  {lines.map(({ dish, line }) => {
+                    const unitPrice = lineUnitPrice(dish, line.choiceIds)
+                    const optionsSummary = lineOptionsSummary(dish, line.choiceIds)
+                    return (
+                      <li key={line.key} className="flex items-center gap-3">
+                        <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-secondary/30">
+                          {dish.image ? <img src={dish.image} alt={dish.name} className="h-full w-full object-contain p-1.5" /> : <ShoppingBag className="size-6 text-muted-foreground" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold">{dish.name}</p>
+                          {optionsSummary && <p className="truncate text-xs text-primary">{optionsSummary}</p>}
+                          <p className="text-xs text-muted-foreground">Rs. {unitPrice} each</p>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-xl border border-border p-1">
+                          <button aria-label={`Decrease ${dish.name}`} onClick={() => onDecrement(line.key)} className="flex size-7 items-center justify-center rounded-lg transition hover:bg-secondary">
+                            <Minus className="size-3.5" />
+                          </button>
+                          <span className="w-5 text-center text-sm font-bold">{line.quantity}</span>
+                          <button aria-label={`Increase ${dish.name}`} onClick={() => onIncrement(line.key)} className="flex size-7 items-center justify-center rounded-lg transition hover:bg-secondary">
+                            <Plus className="size-3.5" />
+                          </button>
+                        </div>
+                        <button aria-label={`Remove ${dish.name}`} onClick={() => onRemove(line.key)} className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive">
+                          <Trash2 className="size-4" />
                         </button>
-                        <span className="w-5 text-center text-sm font-bold">{quantity}</span>
-                        <button aria-label={`Increase ${dish.name}`} onClick={() => onIncrement(dish.id)} className="flex size-7 items-center justify-center rounded-lg transition hover:bg-secondary">
-                          <Plus className="size-3.5" />
-                        </button>
-                      </div>
-                      <button aria-label={`Remove ${dish.name}`} onClick={() => onRemove(dish.id)} className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive">
-                        <Trash2 className="size-4" />
-                      </button>
-                    </li>
-                  ))}
+                      </li>
+                    )
+                  })}
                 </ul>
 
                 <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5">

@@ -45,7 +45,12 @@ alter table public.customers add column if not exists branch text not null defau
 -- orders' FK depends on this PK, so it has to come off first — safe on a
 -- fresh install too (orders may not exist yet), re-added down in the
 -- orders section as a composite FK.
+-- Drop both the original FK name and the composite one this migration
+-- creates further down (line ~118) — re-running this script a second time
+-- would otherwise fail here, since by then the FK has already been renamed
+-- and still depends on this primary key.
 alter table if exists public.orders drop constraint if exists orders_customer_phone_fkey;
+alter table if exists public.orders drop constraint if exists orders_customer_phone_branch_fkey;
 alter table public.customers drop constraint if exists customers_pkey;
 alter table public.customers add primary key (phone, branch);
 
@@ -75,7 +80,15 @@ create table if not exists public.site_settings (
 );
 
 alter table public.site_settings add column if not exists branch text references public.branches(slug);
-update public.site_settings set branch = 'ghouri-town' where branch is null and id = 1;
+-- Only meaningful on the very first run (id gets dropped below, right after
+-- being used once) — guarded so re-running this script doesn't fail once
+-- the column is already gone.
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'site_settings' and column_name = 'id') then
+    update public.site_settings set branch = 'ghouri-town' where branch is null and id = 1;
+  end if;
+end $$;
 alter table public.site_settings drop constraint if exists site_settings_singleton;
 alter table public.site_settings drop constraint if exists site_settings_pkey;
 alter table public.site_settings alter column branch set not null;
@@ -263,6 +276,58 @@ on conflict (id) do nothing;
 
 select setval('public.menu_items_id_seq', (select greatest(max(id), 1) from public.menu_items));
 
+-- =========================================================
+-- menu_item_option_groups / menu_item_option_choices — per-item variant
+-- choices, e.g. a pizza's "Size" group (Small/Medium/Large) or "Flavour"
+-- group (Regular/Spicy +Rs. 30). Each group is single-select (the customer
+-- picks exactly one choice from it) and, when required, must be answered
+-- before the item can be added to the cart. price_delta is added to the
+-- item's base price — it can be 0, positive, or negative.
+--
+-- Deleting a menu item cascades to its groups and choices; deleting a group
+-- cascades to its choices. Nothing here is branch-scoped directly — a
+-- group/choice belongs to one menu_items row, which already belongs to one
+-- branch.
+-- =========================================================
+create table if not exists public.menu_item_option_groups (
+  id           bigserial primary key,
+  menu_item_id bigint not null references public.menu_items(id) on delete cascade,
+  name         text not null,
+  required     boolean not null default true,
+  sort_order   integer not null default 0,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists idx_option_groups_menu_item_id on public.menu_item_option_groups (menu_item_id);
+
+create table if not exists public.menu_item_option_choices (
+  id              bigserial primary key,
+  option_group_id bigint not null references public.menu_item_option_groups(id) on delete cascade,
+  name            text not null,
+  price_delta     numeric(10, 2) not null default 0,
+  sort_order      integer not null default 0,
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists idx_option_choices_group_id on public.menu_item_option_choices (option_group_id);
+
+alter table public.menu_item_option_groups enable row level security;
+alter table public.menu_item_option_choices enable row level security;
+
+drop policy if exists "menu item option groups are publicly readable" on public.menu_item_option_groups;
+create policy "menu item option groups are publicly readable"
+  on public.menu_item_option_groups
+  for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "menu item option choices are publicly readable" on public.menu_item_option_choices;
+create policy "menu item option choices are publicly readable"
+  on public.menu_item_option_choices
+  for select
+  to anon, authenticated
+  using (true);
+
 -- Storage bucket for admin-uploaded item photos (public read, so <img src>
 -- can hit the CDN URL directly with no auth). Writes only ever happen
 -- through the service-role admin client, which bypasses storage RLS
@@ -376,13 +441,24 @@ create policy "site settings are publicly readable"
 -- Creates/updates the customer by phone, blocks banned numbers, and
 -- inserts the order + line items atomically.
 --
--- p_items shape: [{"id": 7, "name": "Zinger Burger", "category": "Burgers", "unit_price": 400, "quantity": 2}, ...]
+-- p_items shape: [{"id": 7, "name": "Zinger Burger", "category": "Burgers",
+-- "unit_price": 400, "quantity": 2, "option_choice_ids": [12, 15]}, ...]
 -- "id" matches menu_items.id and is checked there — a sold-out item can't
 -- be ordered even if the customer's page was open before it was toggled
 -- off, and menu_items.price always overrides the client-sent unit_price.
 -- Every item must belong to p_branch or the whole order is rejected — this
 -- also stops a stale/tampered client sending an id that doesn't exist (which
 -- would otherwise fall back to trusting the client-sent price).
+--
+-- "option_choice_ids" is which menu_item_option_choices the customer picked
+-- (e.g. one id for "Size: Large", one for "Flavour: Spicy") — optional, and
+-- ignored/empty for an item with no option groups. Every required group on
+-- that item must have exactly one choice selected, at most one choice per
+-- group is allowed, and every choice must actually belong to that item —
+-- all checked server-side, same as the base price. The chosen names get
+-- folded into the order_items snapshot as "Zinger Burger (Large, Spicy)"
+-- and their price_delta is added to the line's unit price.
+--
 -- p_latitude/p_longitude are optional (from the browser's geolocation, if the
 -- customer grants permission) — delivery_address is always the primary
 -- human-entered location.
@@ -407,13 +483,23 @@ security definer
 set search_path = public
 as $$
 declare
-  v_is_banned      boolean;
-  v_order_id       uuid;
-  v_subtotal       numeric(10, 2);
-  v_delivery_fee   numeric(10, 2);
-  v_total          numeric(10, 2);
-  v_sold_out_names text;
-  v_invalid_names  text;
+  v_is_banned          boolean;
+  v_order_id           uuid;
+  v_subtotal           numeric(10, 2) := 0;
+  v_delivery_fee       numeric(10, 2);
+  v_sold_out_names     text;
+  v_invalid_names      text;
+  v_item               jsonb;
+  v_mi                 record;
+  v_option_ids         bigint[];
+  v_bad_choice         boolean;
+  v_dup_group          boolean;
+  v_missing_group_name text;
+  v_price_delta_sum    numeric(10, 2);
+  v_chosen_names       text[];
+  v_line_unit_price    numeric(10, 2);
+  v_full_name          text;
+  v_quantity           integer;
 begin
   if p_branch is null or not exists (select 1 from public.branches where slug = p_branch) then
     raise exception 'Unknown branch.';
@@ -467,32 +553,84 @@ begin
     raise exception 'This phone number is banned from placing orders.';
   end if;
 
-  -- menu_items.price always wins over whatever price the client sent, so a
-  -- stale page can't under-charge (or over-charge) against the admin's
-  -- current rate. (The validation above already guarantees a match exists.)
-  select sum(coalesce(mi.price, (item->>'unit_price')::numeric) * (item->>'quantity')::integer)
-  into v_subtotal
-  from jsonb_array_elements(p_items) as item
-  left join public.menu_items mi on mi.id = (item->>'id')::bigint and mi.branch = p_branch;
-
   -- Delivery charge isn't collected from the customer at order time — it's
   -- confirmed over WhatsApp and set by the admin per order afterwards.
   v_delivery_fee := 0;
-  v_total := v_subtotal + v_delivery_fee;
 
+  -- Created with a placeholder total, corrected below once every line
+  -- (including its option price deltas) has been validated and priced.
   insert into public.orders (customer_phone, branch, delivery_address, latitude, longitude, notes, delivery_fee, total_amount)
-  values (trim(p_phone), p_branch, trim(p_address), p_latitude, p_longitude, nullif(trim(p_notes), ''), v_delivery_fee, v_total)
+  values (trim(p_phone), p_branch, trim(p_address), p_latitude, p_longitude, nullif(trim(p_notes), ''), v_delivery_fee, 0)
   returning id into v_order_id;
 
-  insert into public.order_items (order_id, item_name, item_category, unit_price, quantity)
-  select
-    v_order_id,
-    item->>'name',
-    item->>'category',
-    coalesce(mi.price, (item->>'unit_price')::numeric),
-    (item->>'quantity')::integer
-  from jsonb_array_elements(p_items) as item
-  left join public.menu_items mi on mi.id = (item->>'id')::bigint and mi.branch = p_branch;
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    -- menu_items.price always wins over whatever price the client sent, so a
+    -- stale page can't under-charge (or over-charge) against the admin's
+    -- current rate. (The bulk check above already guarantees a match exists.)
+    select id, name, price into v_mi
+    from public.menu_items
+    where id = (v_item->>'id')::bigint and branch = p_branch;
+
+    select coalesce(array_agg((elem)::bigint), array[]::bigint[])
+    into v_option_ids
+    from jsonb_array_elements_text(coalesce(v_item->'option_choice_ids', '[]'::jsonb)) as elem;
+
+    select exists (
+      select 1 from unnest(v_option_ids) as cid
+      where not exists (
+        select 1
+        from public.menu_item_option_choices c
+        join public.menu_item_option_groups g on g.id = c.option_group_id
+        where c.id = cid and g.menu_item_id = v_mi.id
+      )
+    ) into v_bad_choice;
+
+    if v_bad_choice then
+      raise exception 'Invalid option selected for %.', v_mi.name;
+    end if;
+
+    select exists (
+      select 1
+      from public.menu_item_option_choices
+      where id = any(v_option_ids)
+      group by option_group_id
+      having count(*) > 1
+    ) into v_dup_group;
+
+    if v_dup_group then
+      raise exception 'Only one choice is allowed per option for %.', v_mi.name;
+    end if;
+
+    select g.name into v_missing_group_name
+    from public.menu_item_option_groups g
+    where g.menu_item_id = v_mi.id and g.required
+      and not exists (
+        select 1 from public.menu_item_option_choices c
+        where c.option_group_id = g.id and c.id = any(v_option_ids)
+      )
+    limit 1;
+
+    if v_missing_group_name is not null then
+      raise exception 'Please choose a % for %.', v_missing_group_name, v_mi.name;
+    end if;
+
+    select coalesce(sum(price_delta), 0), coalesce(array_agg(name order by sort_order), array[]::text[])
+    into v_price_delta_sum, v_chosen_names
+    from public.menu_item_option_choices
+    where id = any(v_option_ids);
+
+    v_line_unit_price := v_mi.price + v_price_delta_sum;
+    v_full_name := v_mi.name || case when coalesce(array_length(v_chosen_names, 1), 0) > 0 then ' (' || array_to_string(v_chosen_names, ', ') || ')' else '' end;
+    v_quantity := (v_item->>'quantity')::integer;
+
+    insert into public.order_items (order_id, item_name, item_category, unit_price, quantity)
+    values (v_order_id, v_full_name, v_item->>'category', v_line_unit_price, v_quantity);
+
+    v_subtotal := v_subtotal + v_line_unit_price * v_quantity;
+  end loop;
+
+  update public.orders set total_amount = v_subtotal + v_delivery_fee where id = v_order_id;
 
   return v_order_id;
 end;

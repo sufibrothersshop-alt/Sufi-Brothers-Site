@@ -1,6 +1,26 @@
 // Individual items live in the menu_items table (admin-managed from
 // /admin/menu — see lib/use-resolved-menu.ts), not here. This file only
 // keeps the fixed category list/emoji and the shape items come back in.
+
+// A single pickable choice within a group, e.g. "Large" (+Rs. 100) inside a
+// "Size" group. priceDelta is added to the item's base price when chosen —
+// it can be 0, positive, or negative.
+export type MenuItemOptionChoice = {
+  id: number
+  name: string
+  priceDelta: number
+}
+
+// A single-select variant question, e.g. "Size" or "Flavour". When
+// `required`, the customer must pick exactly one choice before the item can
+// be added to the cart.
+export type MenuItemOptionGroup = {
+  id: number
+  name: string
+  required: boolean
+  choices: MenuItemOptionChoice[]
+}
+
 export type MenuItem = {
   id: number
   category: string
@@ -8,6 +28,7 @@ export type MenuItem = {
   subtitle: string
   price: number
   image: string | null
+  optionGroups: MenuItemOptionGroup[]
 }
 
 // The original (Ghouri Town) category set — still used to order/emoji any

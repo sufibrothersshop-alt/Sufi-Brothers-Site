@@ -3,17 +3,7 @@ import type { Metadata } from 'next'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { HomePage } from '@/components/home-page'
 import { BRANCHES, branchName, isBranch, type Branch } from '@/lib/branches'
-import type { ResolvedMenuItem } from '@/lib/use-resolved-menu'
-
-type MenuItemRow = {
-  id: number
-  category: string
-  name: string
-  subtitle: string
-  price: number
-  image: string | null
-  is_available: boolean
-}
+import { MENU_ITEM_SELECT, toResolvedMenuItem, type MenuItemRow, type ResolvedMenuItem } from '@/lib/menu-item-row'
 
 // Prerenders both known branches at build time — this is what makes each
 // branch's page a plain cached (ISR) page instead of a per-request render.
@@ -48,7 +38,7 @@ export default async function Page({ params }: { params: Promise<{ branch: strin
 
   const { data, error } = await admin
     .from('menu_items')
-    .select('id, category, name, subtitle, price, image, is_available')
+    .select(MENU_ITEM_SELECT)
     .eq('branch', branch)
     .order('id')
     .returns<MenuItemRow[]>()
@@ -57,15 +47,7 @@ export default async function Page({ params }: { params: Promise<{ branch: strin
   // last good cached page, whereas an empty one would get cached itself.
   if (error) throw new Error(`Failed to load menu: ${error.message}`)
 
-  const initialMenuItems: ResolvedMenuItem[] = (data ?? []).map((row) => ({
-    id: row.id,
-    category: row.category,
-    name: row.name,
-    subtitle: row.subtitle,
-    price: row.price,
-    image: row.image,
-    available: row.is_available,
-  }))
+  const initialMenuItems: ResolvedMenuItem[] = (data ?? []).map(toResolvedMenuItem)
 
   return <HomePage branch={branch} initialMenuItems={initialMenuItems} />
 }

@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import { categoriesFromItems, getCategoryEmoji } from '@/lib/menu-data'
+import { cartLineKey, dishRequiresChoice, lineUnitPrice, type CartLine } from '@/lib/cart'
 import { DishDialog } from '@/components/dish-dialog'
 import { CartDialog } from '@/components/cart-dialog'
 import { OrderTrackerWidget } from '@/components/order-tracker-widget'
@@ -38,7 +39,7 @@ export function HomePage({ branch, initialMenuItems }: { branch: Branch; initial
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const currentCategory = activeCategory && menuCategories.includes(activeCategory) ? activeCategory : (menuCategories[0] ?? null)
   const [search, setSearch] = useState('')
-  const [cart, setCart] = useState<Record<number, number>>({})
+  const [cart, setCart] = useState<Record<string, CartLine>>({})
   const [mobileOpen, setMobileOpen] = useState(false)
   const [liked, setLiked] = useState<number[]>([])
   const [selectedDish, setSelectedDish] = useState<ResolvedMenuItem | null>(null)
@@ -51,22 +52,37 @@ export function HomePage({ branch, initialMenuItems }: { branch: Branch; initial
     return categoryMatch && searchMatch
   }), [menuItems, currentCategory, search])
 
-  const cartCount = Object.values(cart).reduce((sum, value) => sum + value, 0)
-  const cartTotal = menuItems.reduce((sum, dish) => sum + dish.price * (cart[dish.id] || 0), 0)
+  const cartCount = Object.values(cart).reduce((sum, line) => sum + line.quantity, 0)
+  const cartTotal = Object.values(cart).reduce((sum, line) => {
+    const dish = menuItems.find((item) => item.id === line.itemId)
+    return dish ? sum + lineUnitPrice(dish, line.choiceIds) * line.quantity : sum
+  }, 0)
 
-  const addToCart = (id: number, quantity = 1) => setCart((current) => ({ ...current, [id]: (current[id] || 0) + quantity }))
+  // Same item + same choices (e.g. two "Large, Spicy" burgers) merge into
+  // one line and just bump the quantity; different choices get their own
+  // line since they're priced and printed differently.
+  const addToCart = (id: number, choiceIds: number[] = [], quantity = 1) => {
+    const key = cartLineKey(id, choiceIds)
+    setCart((current) => ({
+      ...current,
+      [key]: { key, itemId: id, choiceIds, quantity: (current[key]?.quantity || 0) + quantity },
+    }))
+  }
   const toggleLike = (id: number) => setLiked((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
-  const incrementCartItem = (id: number) => setCart((current) => ({ ...current, [id]: (current[id] || 0) + 1 }))
-  const decrementCartItem = (id: number) => setCart((current) => {
-    const next = (current[id] || 0) - 1
-    if (next <= 0) {
-      const { [id]: _removed, ...rest } = current
+  const incrementCartLine = (key: string) => setCart((current) => (
+    current[key] ? { ...current, [key]: { ...current[key], quantity: current[key].quantity + 1 } } : current
+  ))
+  const decrementCartLine = (key: string) => setCart((current) => {
+    const line = current[key]
+    if (!line) return current
+    if (line.quantity <= 1) {
+      const { [key]: _removed, ...rest } = current
       return rest
     }
-    return { ...current, [id]: next }
+    return { ...current, [key]: { ...line, quantity: line.quantity - 1 } }
   })
-  const removeCartItem = (id: number) => setCart((current) => {
-    const { [id]: _removed, ...rest } = current
+  const removeCartLine = (key: string) => setCart((current) => {
+    const { [key]: _removed, ...rest } = current
     return rest
   })
 
@@ -117,7 +133,7 @@ export function HomePage({ branch, initialMenuItems }: { branch: Branch; initial
 
       <section className="mx-auto max-w-7xl px-5 py-8 lg:px-8"><div className="mb-6 flex items-end justify-between"><div><p className="text-sm font-bold uppercase tracking-[0.15em] text-primary">Hungry already?</p><h2 className="mt-1 font-serif text-3xl font-black">Explore categories</h2></div><a href="#menu" className="hidden items-center gap-1 text-sm font-bold text-primary sm:flex">View menu <ArrowRight className="size-4" /></a></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">{menuCategories.map((name) => <button key={name} onClick={() => { setActiveCategory(name); setSearch(''); document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' }) }} className="group flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-1 hover:border-primary hover:shadow-lg hover:shadow-primary/10"><span className="text-4xl transition group-hover:scale-110">{getCategoryEmoji(name)}</span><span className="text-center text-sm font-bold">{name}</span></button>)}</div></section>
 
-      <section id="menu" className="mx-auto max-w-7xl px-5 py-12 lg:px-8"><div className="mb-6"><p className="text-sm font-bold uppercase tracking-[0.15em] text-primary">Fresh & full menu</p><h2 className="mt-1 font-serif text-3xl font-black">Our menu</h2></div><div className="mb-8 flex flex-wrap gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm">{menuCategories.map((category) => <button key={category} onClick={() => setActiveCategory(category)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${currentCategory === category ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary/60 text-secondary-foreground hover:bg-primary/15'}`}>{category}</button>)}</div><div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">{filteredDishes.map((dish) => { const isSoldOut = !dish.available; return <article key={dish.id} onClick={() => setSelectedDish(dish)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDish(dish) } }} className="group cursor-pointer overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"><div className="relative aspect-square overflow-hidden bg-secondary/40">{dish.image ? <img src={dish.image} alt={dish.name} className={`h-full w-full object-contain p-3 transition duration-500 group-hover:scale-105 sm:p-6 ${isSoldOut ? 'opacity-50 grayscale' : ''}`} /> : <div className={`flex h-full w-full items-center justify-center text-4xl sm:text-6xl ${isSoldOut ? 'opacity-50 grayscale' : ''}`}>{getCategoryEmoji(dish.category)}</div>}{isSoldOut && <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-foreground/80 py-1.5 text-center text-[10px] font-black uppercase tracking-widest text-background sm:text-xs">Sold out</span>}<button onClick={(e) => { e.stopPropagation(); toggleLike(dish.id) }} aria-label={`Like ${dish.name}`} className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-card/90 text-primary shadow sm:right-3 sm:top-3 sm:size-9"><Heart className={`size-3.5 sm:size-4 ${liked.includes(dish.id) ? 'fill-primary' : ''}`} /></button><span className="absolute bottom-2 left-2 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-secondary-foreground sm:bottom-3 sm:left-3 sm:px-3 sm:py-1 sm:text-xs">{dish.category}</span></div><div className="p-3 sm:p-5"><h3 className="text-sm font-black sm:text-lg">{dish.name}</h3><p dir="auto" className="mt-1 text-[11px] leading-4 text-muted-foreground sm:text-xs sm:leading-5">{dish.subtitle}</p><div className="mt-3 flex items-center justify-between gap-2 sm:mt-5"><span className="font-serif text-base font-black text-primary sm:text-xl">Rs. {dish.price}</span>{isSoldOut ? <span className="rounded-xl bg-secondary px-2 py-1.5 text-[11px] font-bold text-muted-foreground sm:px-3 sm:py-2 sm:text-xs">Sold out</span> : <button onClick={(e) => { e.stopPropagation(); addToCart(dish.id) }} className="flex items-center gap-1 rounded-xl bg-primary px-2 py-1.5 text-[11px] font-bold text-primary-foreground transition hover:brightness-110 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"><Plus className="size-3.5 sm:size-4" />Add</button>}</div></div></article> })}</div>
+      <section id="menu" className="mx-auto max-w-7xl px-5 py-12 lg:px-8"><div className="mb-6"><p className="text-sm font-bold uppercase tracking-[0.15em] text-primary">Fresh & full menu</p><h2 className="mt-1 font-serif text-3xl font-black">Our menu</h2></div><div className="mb-8 flex flex-wrap gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm">{menuCategories.map((category) => <button key={category} onClick={() => setActiveCategory(category)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${currentCategory === category ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary/60 text-secondary-foreground hover:bg-primary/15'}`}>{category}</button>)}</div><div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">{filteredDishes.map((dish) => { const isSoldOut = !dish.available; return <article key={dish.id} onClick={() => setSelectedDish(dish)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDish(dish) } }} className="group cursor-pointer overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"><div className="relative aspect-square overflow-hidden bg-secondary/40">{dish.image ? <img src={dish.image} alt={dish.name} className={`h-full w-full object-contain p-3 transition duration-500 group-hover:scale-105 sm:p-6 ${isSoldOut ? 'opacity-50 grayscale' : ''}`} /> : <div className={`flex h-full w-full items-center justify-center text-4xl sm:text-6xl ${isSoldOut ? 'opacity-50 grayscale' : ''}`}>{getCategoryEmoji(dish.category)}</div>}{isSoldOut && <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-foreground/80 py-1.5 text-center text-[10px] font-black uppercase tracking-widest text-background sm:text-xs">Sold out</span>}<button onClick={(e) => { e.stopPropagation(); toggleLike(dish.id) }} aria-label={`Like ${dish.name}`} className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-card/90 text-primary shadow sm:right-3 sm:top-3 sm:size-9"><Heart className={`size-3.5 sm:size-4 ${liked.includes(dish.id) ? 'fill-primary' : ''}`} /></button><span className="absolute bottom-2 left-2 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-secondary-foreground sm:bottom-3 sm:left-3 sm:px-3 sm:py-1 sm:text-xs">{dish.category}</span></div><div className="p-3 sm:p-5"><h3 className="text-sm font-black sm:text-lg">{dish.name}</h3><p dir="auto" className="mt-1 text-[11px] leading-4 text-muted-foreground sm:text-xs sm:leading-5">{dish.subtitle}</p><div className="mt-3 flex items-center justify-between gap-2 sm:mt-5"><span className="font-serif text-base font-black text-primary sm:text-xl">Rs. {dish.price}</span>{isSoldOut ? <span className="rounded-xl bg-secondary px-2 py-1.5 text-[11px] font-bold text-muted-foreground sm:px-3 sm:py-2 sm:text-xs">Sold out</span> : <button onClick={(e) => { e.stopPropagation(); dishRequiresChoice(dish) ? setSelectedDish(dish) : addToCart(dish.id) }} className="flex items-center gap-1 rounded-xl bg-primary px-2 py-1.5 text-[11px] font-bold text-primary-foreground transition hover:brightness-110 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"><Plus className="size-3.5 sm:size-4" />Add</button>}</div></div></article> })}</div>
       <DishDialog dish={selectedDish} available={selectedDish?.available ?? true} open={selectedDish !== null} onOpenChange={(isOpen) => { if (!isOpen) setSelectedDish(null) }} onAddToCart={addToCart} />{filteredDishes.length === 0 && <div className="rounded-3xl border border-dashed border-border py-16 text-center text-muted-foreground">{menuItems.length === 0 ? 'Menu coming soon!' : 'No dishes found. Try another search.'}</div>}</section>
 
       <section id="deals" className="mx-auto max-w-7xl px-5 py-8 lg:px-8"><div className="relative overflow-hidden rounded-[2rem] bg-primary px-7 py-10 text-primary-foreground sm:px-12"><div className="relative z-10 max-w-md"><p className="text-sm font-bold uppercase tracking-[0.18em] text-primary-foreground/70">Sufi Brothers special</p><h2 className="mt-3 font-serif text-4xl font-black leading-tight sm:text-5xl">More bite.<br />Less price.</h2><p className="mt-4 text-sm leading-6 text-primary-foreground/80">Bring your people, pick your favourites and make it a meal to remember.</p><button onClick={() => document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' })} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-secondary px-5 py-3 text-sm font-black text-secondary-foreground">Order now <ArrowRight className="size-4" /></button></div><div className="absolute -right-16 -top-24 size-80 rounded-full border-[28px] border-primary-foreground/10" /><div className="absolute bottom-[-70px] right-8 hidden w-80 rotate-[-8deg] overflow-hidden rounded-3xl border-8 border-primary-foreground/20 shadow-2xl md:block"><img src="/deals/deal-4.webp" alt="Sufi Brothers combo deal" className="h-56 w-full object-cover" /></div></div></section>
@@ -135,9 +151,9 @@ export function HomePage({ branch, initialMenuItems }: { branch: Branch; initial
         menuItems={menuItems}
         cart={cart}
         deliveryEnabled={deliveryEnabled}
-        onIncrement={incrementCartItem}
-        onDecrement={decrementCartItem}
-        onRemove={removeCartItem}
+        onIncrement={incrementCartLine}
+        onDecrement={decrementCartLine}
+        onRemove={removeCartLine}
         onClear={() => setCart({})}
         onOrderPlaced={orderTracker.startTracking}
       />

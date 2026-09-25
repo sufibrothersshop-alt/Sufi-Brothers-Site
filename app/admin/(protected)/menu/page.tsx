@@ -1,17 +1,18 @@
 import { requireAdmin } from '@/lib/admin-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { MenuManagementSection, type AdminMenuItem } from '@/components/admin/menu-availability'
+import { MenuManagementSection } from '@/components/admin/menu-availability'
+import { MENU_ITEM_SELECT, toResolvedMenuItem, type MenuItemRow } from '@/lib/menu-item-row'
 
 export default async function AdminMenuPage() {
   const branch = await requireAdmin()
   const admin = createAdminClient()
 
-  const { data: items } = await admin
+  const { data } = await admin
     .from('menu_items')
-    .select('id, category, name, subtitle, price, image, is_available')
+    .select(MENU_ITEM_SELECT)
     .eq('branch', branch)
     .order('id')
-    .returns<AdminMenuItem[]>()
+    .returns<MenuItemRow[]>()
 
-  return <MenuManagementSection items={items ?? []} />
+  return <MenuManagementSection items={(data ?? []).map(toResolvedMenuItem)} />
 }

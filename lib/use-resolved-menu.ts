@@ -1,33 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { MenuItem } from '@/lib/menu-data'
 import { createClient } from '@/lib/supabase/client'
 import type { Branch } from '@/lib/branches'
+import { MENU_ITEM_SELECT, toResolvedMenuItem, type MenuItemRow, type ResolvedMenuItem } from '@/lib/menu-item-row'
 
-export type ResolvedMenuItem = MenuItem & { available: boolean }
-
-type MenuItemRow = {
-  id: number
-  category: string
-  name: string
-  subtitle: string
-  price: number
-  image: string | null
-  is_available: boolean
-}
-
-function toResolved(row: MenuItemRow): ResolvedMenuItem {
-  return {
-    id: row.id,
-    category: row.category,
-    name: row.name,
-    subtitle: row.subtitle,
-    price: row.price,
-    image: row.image,
-    available: row.is_available,
-  }
-}
+export type { ResolvedMenuItem }
 
 // The menu itself lives in the menu_items table (admin-managed — see
 // /admin/menu), not in code. `initial` is the server-fetched snapshot used
@@ -43,13 +21,13 @@ export function useResolvedMenu(branch: Branch, initial: ResolvedMenuItem[] = []
 
     supabase
       .from('menu_items')
-      .select('id, category, name, subtitle, price, image, is_available')
+      .select(MENU_ITEM_SELECT)
       .eq('branch', branch)
       .order('id')
       .returns<MenuItemRow[]>()
       .then(({ data }) => {
         if (cancelled || !data) return
-        setResolved(data.map(toResolved))
+        setResolved(data.map(toResolvedMenuItem))
       })
 
     return () => {
