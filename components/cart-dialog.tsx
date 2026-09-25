@@ -163,7 +163,7 @@ export function CartDialog({ open, onOpenChange, branch, menuItems, cart, delive
                     return (
                       <li key={line.key} className="flex items-center gap-3">
                         <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-secondary/30">
-                          {dish.image ? <img src={dish.image} alt={dish.name} className="h-full w-full object-contain p-1.5" /> : <ShoppingBag className="size-6 text-muted-foreground" />}
+                          {dish.image ? <img src={dish.image} alt={dish.name} className="h-full w-full object-cover" /> : <ShoppingBag className="size-6 text-muted-foreground" />}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold">{dish.name}</p>

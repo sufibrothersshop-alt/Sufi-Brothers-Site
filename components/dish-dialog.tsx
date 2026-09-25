@@ -44,7 +44,7 @@ export function DishDialog({ dish, available, open, onOpenChange, onAddToCart, c
           <Dialog.Popup className="flex max-h-[95vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-border/40 bg-card/40 shadow-2xl backdrop-blur-md outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95">
             <div className="relative h-40 w-full shrink-0 bg-secondary/20 sm:h-52">
               {dish.image ? (
-                <img src={dish.image} alt={dish.name} className={`h-full w-full object-contain p-5 sm:p-8 ${available ? '' : 'opacity-50 grayscale'}`} />
+                <img src={dish.image} alt={dish.name} className={`h-full w-full object-cover ${available ? '' : 'opacity-50 grayscale'}`} />
               ) : (
                 <div className={`flex h-full w-full items-center justify-center text-5xl sm:text-7xl ${available ? '' : 'opacity-50 grayscale'}`}>{getCategoryEmoji(dish.category, categoryIcons)}</div>
               )}
