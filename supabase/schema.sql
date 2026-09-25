@@ -707,16 +707,24 @@ grant execute on function public.get_customer_info(text, text) to anon, authenti
 -- receipt number: an unguessable UUID the customer already has from
 -- place_order's return value, not something that lets you browse other
 -- people's orders.
+--
+-- Also returns total_amount so the tracker widget can pick up a delivery
+-- fee the admin adds after the order is placed (place_order always inserts
+-- with delivery_fee = 0; updateDeliveryFee in app/admin/actions.ts is what
+-- sets the real one) — the widget's very first total, captured client-side
+-- when the order was placed, never includes it.
 -- =========================================================
+drop function if exists public.get_order_status(uuid);
+
 create or replace function public.get_order_status(p_order_id uuid)
-returns table (status text, rider_name text, rider_phone text)
+returns table (status text, rider_name text, rider_phone text, total_amount numeric)
 language plpgsql
 security definer
 set search_path = public
 as $$
 begin
   return query
-  select o.status, r.name, r.phone
+  select o.status, r.name, r.phone, o.total_amount
   from public.orders o
   left join public.riders r on r.id = o.rider_id
   where o.id = p_order_id;

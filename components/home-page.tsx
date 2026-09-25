@@ -171,6 +171,7 @@ export function HomePage({
       {orderTracker.activeOrder && (
         <OrderTrackerWidget
           order={orderTracker.activeOrder}
+          total={orderTracker.total}
           progress={orderTracker.progress}
           remainingMinutes={orderTracker.remainingMinutes}
           currentPhaseIndex={orderTracker.currentPhaseIndex}

@@ -50,7 +50,7 @@ function statusToPhase(status: string): number | 'done' | 'cancelled' {
   }
 }
 
-type PolledStatus = { status: string; riderName: string | null; riderPhone: string | null }
+type PolledStatus = { status: string; riderName: string | null; riderPhone: string | null; total: number }
 
 export function useOrderTracker() {
   const [activeOrder, setActiveOrder] = useState<ActiveOrder | null>(null)
@@ -92,7 +92,7 @@ export function useOrderTracker() {
       const { data } = await supabase.rpc('get_order_status', { p_order_id: activeOrder.id })
       const row = data?.[0]
       if (!cancelled && row) {
-        setPolled({ status: row.status, riderName: row.rider_name, riderPhone: row.rider_phone })
+        setPolled({ status: row.status, riderName: row.rider_name, riderPhone: row.rider_phone, total: Number(row.total_amount) })
       }
     }
     poll()
@@ -146,6 +146,11 @@ export function useOrderTracker() {
 
   const remainingMinutes = Math.max(0, Math.ceil(TOTAL_ORDER_MINUTES - elapsedMinutes))
 
+  // Prefer the polled total (reflects a delivery fee the admin adds after
+  // the order is placed) over the snapshot captured at checkout time, which
+  // is always the food subtotal only.
+  const total = polled?.total ?? activeOrder?.total ?? 0
+
   return {
     activeOrder,
     startTracking,
@@ -157,5 +162,6 @@ export function useOrderTracker() {
     isCancelled,
     riderName: polled?.riderName ?? null,
     riderPhone: polled?.riderPhone ?? null,
+    total,
   }
 }

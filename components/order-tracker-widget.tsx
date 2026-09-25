@@ -10,6 +10,7 @@ const PHASE_ICONS = [Clock3, Flame, Bike]
 
 type OrderTrackerWidgetProps = {
   order: ActiveOrder
+  total: number
   progress: number
   remainingMinutes: number
   currentPhaseIndex: number
@@ -22,6 +23,7 @@ type OrderTrackerWidgetProps = {
 
 export function OrderTrackerWidget({
   order,
+  total,
   progress,
   remainingMinutes,
   currentPhaseIndex,
@@ -60,7 +62,7 @@ export function OrderTrackerWidget({
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">{isDelivered ? 'Enjoy your meal!' : `~${remainingMinutes} min left`}</p>
-                  <p className="mt-1 text-sm font-bold text-primary">Rs. {order.total}</p>
+                  <p className="mt-1 text-sm font-bold text-primary">Rs. {total}</p>
                 </div>
               </div>
 
